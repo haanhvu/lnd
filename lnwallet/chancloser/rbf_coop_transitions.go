@@ -34,15 +34,17 @@ var (
 func sendShutdownEvents(chanID lnwire.ChannelID, chanPoint wire.OutPoint,
 	deliveryAddr lnwire.DeliveryAddress, peerPub btcec.PublicKey,
 	postSendEvent fn.Option[ProtocolEvent],
-	chanState ChanStateObserver) (protofsm.DaemonEventSet, error) {
+	chanState ChanStateObserver,
+	shutdownCustomRecords lnwire.CustomRecords) (protofsm.DaemonEventSet, error) {
 
 	// We'll emit a daemon event that instructs the daemon to send out a
 	// new shutdown message to the remote peer.
 	msgsToSend := &protofsm.SendMsgEvent[ProtocolEvent]{
 		TargetPeer: peerPub,
 		Msgs: []lnwire.Message{&lnwire.Shutdown{
-			ChannelID: chanID,
-			Address:   deliveryAddr,
+			ChannelID:     chanID,
+			Address:       deliveryAddr,
+			CustomRecords: shutdownCustomRecords,
 		}},
 		SendWhen: fn.Some(func() bool {
 			ok := chanState.NoDanglingUpdates()
@@ -165,6 +167,11 @@ func (c *ChannelActive) ProcessEvent(event ProtocolEvent,
 			return nil, err
 		}
 
+		shutdownCustomRecords, err := env.ShutdownCustomRecords()
+		if err != nil {
+			return nil, err
+		}
+
 		// We'll emit some daemon events to send the shutdown message
 		// and disable the channel on the network level. In this case,
 		// we don't need a post send event as receive their shutdown is
@@ -172,7 +179,7 @@ func (c *ChannelActive) ProcessEvent(event ProtocolEvent,
 		daemonEvents, err := sendShutdownEvents(
 			env.ChanID, env.ChanPoint, shutdownScript,
 			env.ChanPeer, fn.None[ProtocolEvent](),
-			env.ChanObserver,
+			env.ChanObserver, shutdownCustomRecords,
 		)
 		if err != nil {
 			return nil, err
@@ -180,6 +187,8 @@ func (c *ChannelActive) ProcessEvent(event ProtocolEvent,
 
 		chancloserLog.Infof("ChannelPoint(%v): sending shutdown msg, "+
 			"delivery_script=%x", env.ChanPoint, shutdownScript)
+
+		//Compute LocalCloseOutput here
 
 		// From here, we'll transition to the shutdown pending state. In
 		// this state we await their shutdown message (self loop), then
@@ -189,6 +198,9 @@ func (c *ChannelActive) ProcessEvent(event ProtocolEvent,
 				IdealFeeRate: fn.Some(msg.IdealFeeRate),
 				ShutdownScripts: ShutdownScripts{
 					LocalDeliveryScript: shutdownScript,
+				},
+				ShutdownCustomRecords: ShutdownCustomRecords{
+					LocalCustomRecords: shutdownCustomRecords,
 				},
 			},
 			NewEvents: fn.Some(RbfEvent{
@@ -230,6 +242,11 @@ func (c *ChannelActive) ProcessEvent(event ProtocolEvent,
 		chancloserLog.Infof("ChannelPoint(%v): sending shutdown msg "+
 			"at next clean commit state", env.ChanPoint)
 
+		shutdownCustomRecords, err := env.ShutdownCustomRecords()
+		if err != nil {
+			return nil, err
+		}
+
 		// Now that we know the shutdown message is valid, we'll obtain
 		// the set of daemon events we need to emit. We'll also specify
 		// that once the message has actually been sent, that we
@@ -238,7 +255,7 @@ func (c *ChannelActive) ProcessEvent(event ProtocolEvent,
 			env.ChanID, env.ChanPoint, shutdownAddr,
 			env.ChanPeer,
 			fn.Some[ProtocolEvent](&ShutdownComplete{}),
-			env.ChanObserver,
+			env.ChanObserver, shutdownCustomRecords,
 		)
 		if err != nil {
 			return nil, err
@@ -261,6 +278,10 @@ func (c *ChannelActive) ProcessEvent(event ProtocolEvent,
 				ShutdownScripts: ShutdownScripts{
 					LocalDeliveryScript:  shutdownAddr,
 					RemoteDeliveryScript: remoteAddr,
+				},
+				ShutdownCustomRecords: ShutdownCustomRecords{
+					LocalCustomRecords:  shutdownCustomRecords,
+					RemoteCustomRecords: msg.CustomRecords,
 				},
 			},
 			NewEvents: fn.Some(protofsm.EmittedEvent[ProtocolEvent]{
@@ -381,6 +402,10 @@ func (s *ShutdownPending) ProcessEvent(event ProtocolEvent,
 					LocalDeliveryScript:  s.LocalDeliveryScript, //nolint:ll
 					RemoteDeliveryScript: msg.ShutdownScript,    //nolint:ll
 				},
+				ShutdownCustomRecords: ShutdownCustomRecords{
+					LocalCustomRecords:  s.LocalCustomRecords,
+					RemoteCustomRecords: msg.CustomRecords,
+				},
 			},
 			NewEvents: newEvents,
 		}, nil
@@ -423,8 +448,9 @@ func (s *ShutdownPending) ProcessEvent(event ProtocolEvent,
 		// We'll stay here until we receive the ChannelFlushed event.
 		return &CloseStateTransition{
 			NextState: &ChannelFlushing{
-				IdealFeeRate:    s.IdealFeeRate,
-				ShutdownScripts: s.ShutdownScripts,
+				IdealFeeRate:          s.IdealFeeRate,
+				ShutdownScripts:       s.ShutdownScripts,
+				ShutdownCustomRecords: s.ShutdownCustomRecords,
 			},
 			NewEvents: newEvents,
 		}, nil
@@ -480,8 +506,9 @@ func (c *ChannelFlushing) ProcessEvent(event ProtocolEvent,
 		// we'll be using to close the channel, so we'll create them
 		// here.
 		closeTerms := CloseChannelTerms{
-			ShutdownScripts:  c.ShutdownScripts,
-			ShutdownBalances: msg.ShutdownBalances,
+			ShutdownScripts:       c.ShutdownScripts,
+			ShutdownCustomRecords: c.ShutdownCustomRecords,
+			ShutdownBalances:      msg.ShutdownBalances,
 		}
 
 		chancloserLog.Infof("ChannelPoint(%v): channel flushed! "+
@@ -775,15 +802,39 @@ func (l *LocalCloseStart) ProcessEvent(event ProtocolEvent,
 			}, nil
 		}
 
+		var closeOpts []lnwallet.ChanCloseOpt
+		closeOpts = append(closeOpts,
+			lnwallet.WithCustomSequence(mempool.MaxRBFSequence),
+			lnwallet.WithCustomPayer(lntypes.Local))
+
+		localCloseOutput := env.CloseOutput(l.LocalDeliveryScript, l.LocalCustomRecords)
+		remoteCloseOutput := env.CloseOutput(l.RemoteDeliveryScript, l.RemoteCustomRecords)
+
+		var err error
+		l.AuxOutputs, err = env.AuxCloseOutputs(absoluteFee, localCloseOutput, remoteCloseOutput)
+		if err != nil {
+			return nil, err
+		}
+		l.AuxOutputs.WhenSome(func(outs AuxCloseOutputs) {
+			closeOpts = append(
+				closeOpts, lnwallet.WithExtraCloseOutputs(
+					outs.ExtraCloseOutputs,
+				),
+			)
+			closeOpts = append(
+				closeOpts, lnwallet.WithCustomCoopSort(
+					outs.CustomSort,
+				),
+			)
+		})
+
 		// Now that we know what fee we want to pay, we'll create a new
 		// signature over our co-op close transaction. For our
 		// proposals, we'll just always use the known RBF sequence
 		// value.
 		localScript := l.LocalDeliveryScript
 		rawSig, closeTx, closeBalance, err := env.CloseSigner.CreateCloseProposal( //nolint:ll
-			absoluteFee, localScript, l.RemoteDeliveryScript,
-			lnwallet.WithCustomSequence(mempool.MaxRBFSequence),
-			lnwallet.WithCustomPayer(lntypes.Local),
+			absoluteFee, localScript, l.RemoteDeliveryScript, closeOpts...,
 		)
 		if err != nil {
 			return nil, err
@@ -927,13 +978,36 @@ func (l *LocalOfferSent) ProcessEvent(event ProtocolEvent,
 			return nil, err
 		}
 
+		var closeOpts []lnwallet.ChanCloseOpt
+		closeOpts = append(closeOpts,
+			lnwallet.WithCustomSequence(mempool.MaxRBFSequence),
+			lnwallet.WithCustomPayer(lntypes.Local))
+
+		localCloseOutput := env.CloseOutput(l.LocalDeliveryScript, l.LocalCustomRecords)
+		remoteCloseOutput := env.CloseOutput(l.RemoteDeliveryScript, l.RemoteCustomRecords)
+
+		l.AuxOutputs, err = env.AuxCloseOutputs(l.ProposedFee, localCloseOutput, remoteCloseOutput)
+		if err != nil {
+			return nil, err
+		}
+		l.AuxOutputs.WhenSome(func(outs AuxCloseOutputs) {
+			closeOpts = append(
+				closeOpts, lnwallet.WithExtraCloseOutputs(
+					outs.ExtraCloseOutputs,
+				),
+			)
+			closeOpts = append(
+				closeOpts, lnwallet.WithCustomCoopSort(
+					outs.CustomSort,
+				),
+			)
+		})
+
 		// Now that we have their signature, we'll attempt to validate
 		// it, then extract a valid closing signature from it.
 		closeTx, _, err := env.CloseSigner.CompleteCooperativeClose(
 			localSig, remoteSig, l.LocalDeliveryScript,
-			l.RemoteDeliveryScript, l.ProposedFee,
-			lnwallet.WithCustomSequence(mempool.MaxRBFSequence),
-			lnwallet.WithCustomPayer(lntypes.Local),
+			l.RemoteDeliveryScript, l.ProposedFee, closeOpts...,
 		)
 		if err != nil {
 			return nil, err
@@ -1034,6 +1108,27 @@ func (l *RemoteCloseStart) ProcessEvent(event ProtocolEvent,
 			lnwallet.WithCustomLockTime(msg.SigMsg.LockTime),
 			lnwallet.WithCustomPayer(lntypes.Remote),
 		}
+
+		localCloseOutput := env.CloseOutput(l.LocalDeliveryScript, l.LocalCustomRecords)
+		remoteCloseOutput := env.CloseOutput(l.RemoteDeliveryScript, l.RemoteCustomRecords)
+
+		var err error
+		l.AuxOutputs, err = env.AuxCloseOutputs(msg.SigMsg.FeeSatoshis, localCloseOutput, remoteCloseOutput)
+		if err != nil {
+			return nil, err
+		}
+		l.AuxOutputs.WhenSome(func(outs AuxCloseOutputs) {
+			chanOpts = append(
+				chanOpts, lnwallet.WithExtraCloseOutputs(
+					outs.ExtraCloseOutputs,
+				),
+			)
+			chanOpts = append(
+				chanOpts, lnwallet.WithCustomCoopSort(
+					outs.CustomSort,
+				),
+			)
+		})
 
 		chancloserLog.Infof("responding to close w/ local_addr=%x, "+
 			"remote_addr=%x, fee=%v",
@@ -1165,6 +1260,7 @@ func (c *ClosePending) ProcessEvent(event ProtocolEvent,
 		return &CloseStateTransition{
 			NextState: &CloseFin{
 				ConfirmedTx: msg.Tx,
+				AuxOutputs:  c.AuxOutputs,
 			},
 		}, nil
 

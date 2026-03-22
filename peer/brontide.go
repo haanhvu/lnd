@@ -3807,6 +3807,7 @@ func (p *Brontide) observeRbfCloseUpdates(chanCloser *chancloser.RbfChanCloser,
 					closeReq.Updates <- &ChannelCloseUpdate{
 						ClosingTxid: closingTxid[:],
 						Success:     true,
+						AuxOutputs:  closeState.AuxOutputs,
 					}
 				}
 				chanID := lnwire.NewChanIDFromOutPoint(
@@ -4021,11 +4022,26 @@ func (p *Brontide) initRbfChanCloser(
 			return p.genDeliveryScript()
 		},
 		FeeEstimator: &chancloser.SimpleCoopFeeEstimator{},
+		AuxCloser:    p.cfg.AuxChanCloser,
 		CloseSigner:  channel,
 		ChanObserver: newChanObserver(
 			channel, link, p.cfg.ChanStatusMgr,
 		),
 	}
+
+	shutdownAddr, err := env.LocalUpfrontShutdown.UnwrapOrFuncErr(
+		env.NewDeliveryScript,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	addrWithInternalKey, err := p.addrWithInternalKey(shutdownAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	env.LocalInternalKey = addrWithInternalKey.InternalKey
 
 	spendEvent := protofsm.RegisterSpend[chancloser.ProtocolEvent]{
 		OutPoint:   channel.ChannelPoint(),

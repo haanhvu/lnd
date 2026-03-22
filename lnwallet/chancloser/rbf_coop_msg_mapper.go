@@ -61,6 +61,7 @@ func (r *RbfMsgMapper) MapMsg(wireMsg msgmux.PeerMsg) fn.Option[ProtocolEvent] {
 		return someEvent(&ShutdownReceived{
 			BlockHeight:    r.blockHeight,
 			ShutdownScript: msg.Address,
+			CustomRecords:  msg.CustomRecords,
 		})
 
 	case *lnwire.ClosingComplete:
