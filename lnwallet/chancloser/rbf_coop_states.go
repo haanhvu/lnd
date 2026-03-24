@@ -934,8 +934,10 @@ func (c *ClosePending) IsTerminal() bool {
 // point, the close tx has been confirmed on chain.
 type CloseFin struct {
 	// ConfirmedTx is the transaction that confirmed the channel close.
-	ConfirmedTx *wire.MsgTx
-	AuxOutputs  fn.Option[AuxCloseOutputs]
+	ConfirmedTx       *wire.MsgTx
+	LocalCloseOutput  fn.Option[types.CloseOutput]
+	RemoteCloseOutput fn.Option[types.CloseOutput]
+	AuxOutputs        fn.Option[AuxCloseOutputs]
 }
 
 // String returns the name of the state for CloseFin.

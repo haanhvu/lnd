@@ -188,8 +188,6 @@ func (c *ChannelActive) ProcessEvent(event ProtocolEvent,
 		chancloserLog.Infof("ChannelPoint(%v): sending shutdown msg, "+
 			"delivery_script=%x", env.ChanPoint, shutdownScript)
 
-		//Compute LocalCloseOutput here
-
 		// From here, we'll transition to the shutdown pending state. In
 		// this state we await their shutdown message (self loop), then
 		// also the flushing event.
@@ -1251,16 +1249,21 @@ func (l *RemoteCloseStart) ProcessEvent(event ProtocolEvent,
 // In this state, we're waiting for either a confirmation, or for either side
 // to attempt to create a new RBF'd co-op close transaction.
 func (c *ClosePending) ProcessEvent(event ProtocolEvent,
-	_ *Environment) (*CloseStateTransition, error) {
+	env *Environment) (*CloseStateTransition, error) {
 
 	switch msg := event.(type) {
 	// If we can a spend while waiting for the close, then we'll go to our
 	// terminal state.
 	case *SpendEvent:
+		localCloseOutput := env.CloseOutput(c.LocalDeliveryScript, c.LocalCustomRecords)
+		remoteCloseOutput := env.CloseOutput(c.RemoteDeliveryScript, c.RemoteCustomRecords)
+
 		return &CloseStateTransition{
 			NextState: &CloseFin{
-				ConfirmedTx: msg.Tx,
-				AuxOutputs:  c.AuxOutputs,
+				ConfirmedTx:       msg.Tx,
+				LocalCloseOutput:  localCloseOutput,
+				RemoteCloseOutput: remoteCloseOutput,
+				AuxOutputs:        c.AuxOutputs,
 			},
 		}, nil
 

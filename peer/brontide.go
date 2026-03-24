@@ -3805,9 +3805,11 @@ func (p *Brontide) observeRbfCloseUpdates(chanCloser *chancloser.RbfChanCloser,
 				closingTxid := closeState.ConfirmedTx.TxHash()
 				if closeReq != nil {
 					closeReq.Updates <- &ChannelCloseUpdate{
-						ClosingTxid: closingTxid[:],
-						Success:     true,
-						AuxOutputs:  closeState.AuxOutputs,
+						ClosingTxid:       closingTxid[:],
+						Success:           true,
+						LocalCloseOutput:  closeState.LocalCloseOutput,
+						RemoteCloseOutput: closeState.RemoteCloseOutput,
+						AuxOutputs:        closeState.AuxOutputs,
 					}
 				}
 				chanID := lnwire.NewChanIDFromOutPoint(
