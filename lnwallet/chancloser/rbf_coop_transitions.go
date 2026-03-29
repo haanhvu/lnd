@@ -167,7 +167,7 @@ func (c *ChannelActive) ProcessEvent(event ProtocolEvent,
 			return nil, err
 		}
 
-		shutdownCustomRecords, err := env.ShutdownCustomRecords()
+		shutdownCustomRecords, err := env.ShutdownCustomRecords(true)
 		if err != nil {
 			return nil, err
 		}
@@ -240,7 +240,7 @@ func (c *ChannelActive) ProcessEvent(event ProtocolEvent,
 		chancloserLog.Infof("ChannelPoint(%v): sending shutdown msg "+
 			"at next clean commit state", env.ChanPoint)
 
-		shutdownCustomRecords, err := env.ShutdownCustomRecords()
+		shutdownCustomRecords, err := env.ShutdownCustomRecords(false)
 		if err != nil {
 			return nil, err
 		}

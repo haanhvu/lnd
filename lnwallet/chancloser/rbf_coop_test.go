@@ -22,6 +22,7 @@ import (
 	"github.com/lightningnetwork/lnd/lntest/wait"
 	"github.com/lightningnetwork/lnd/lntypes"
 	"github.com/lightningnetwork/lnd/lnwallet/chainfee"
+	"github.com/lightningnetwork/lnd/lnwallet/types"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/protofsm"
 	"github.com/lightningnetwork/lnd/tlv"
@@ -39,6 +40,13 @@ var (
 		[]byte{txscript.OP_1, txscript.OP_DATA_32},
 		bytes.Repeat([]byte{0x02}, 32)...,
 	))
+
+	localCustomRecords = lnwire.CustomRecords{
+		0: []byte("local"),
+	}
+	remoteCustomRecords = lnwire.CustomRecords{
+		1: []byte("remote"),
+	}
 
 	localSigBytes = fromHex("3045022100cd496f2ab4fe124f977ffe3caa09f757" +
 		"6d8a34156b4e55d326b4dffc0399a094022013500a0510b5094bff220c7" +
@@ -744,6 +752,28 @@ func assertStateT[T ProtocolState](h *rbfCloserTestHarness) T {
 	return currentState
 }
 
+type mockAuxChanCloser struct{}
+
+func (m *mockAuxChanCloser) ShutdownBlob(
+	req types.AuxShutdownReq,
+) (fn.Option[lnwire.CustomRecords], error) {
+
+	return fn.Some[lnwire.CustomRecords](localCustomRecords), nil
+}
+
+func (m *mockAuxChanCloser) AuxCloseOutputs(
+	desc types.AuxCloseDesc) (fn.Option[AuxCloseOutputs], error) {
+
+	// Implement later
+	return fn.None[AuxCloseOutputs](), nil
+}
+
+func (m *mockAuxChanCloser) FinalizeClose(desc types.AuxCloseDesc,
+	closeTx *wire.MsgTx) error {
+
+	return nil
+}
+
 // newRbfCloserTestHarness creates a new test harness for the RBF closer.
 func newRbfCloserTestHarness(t *testing.T,
 	cfg *harnessCfg) *rbfCloserTestHarness {
@@ -793,6 +823,8 @@ func newRbfCloserTestHarness(t *testing.T,
 		LocalUpfrontShutdown:  cfg.localUpfrontAddr,
 		NewDeliveryScript:     harness.newAddrFunc,
 		FeeEstimator:          feeEstimator,
+		AuxCloser:             fn.Some[AuxChanCloser](&mockAuxChanCloser{}),
+		Channel:               &mockChannel{},
 		ChanObserver:          mockObserver,
 		CloseSigner:           mockSigner,
 	}
@@ -925,6 +957,10 @@ func TestRbfChannelActiveTransitions(t *testing.T) {
 			t, localAddr,
 			currentState.ShutdownScripts.LocalDeliveryScript,
 		)
+		require.Equal(
+			t, localCustomRecords,
+			currentState.ShutdownCustomRecords.LocalCustomRecords,
+		)
 
 		// Wait till the msg has been sent to assert our expectations.
 		//
@@ -973,7 +1009,10 @@ func TestRbfChannelActiveTransitions(t *testing.T) {
 		// Next, we'll emit the recv event, with the addr of the remote
 		// party.
 		closeHarness.chanCloser.SendEvent(
-			ctx, &ShutdownReceived{ShutdownScript: remoteAddr},
+			ctx, &ShutdownReceived{
+				ShutdownScript: remoteAddr,
+				CustomRecords:  remoteCustomRecords,
+			},
 		)
 
 		// We should transition to the shutdown pending state.
@@ -989,6 +1028,15 @@ func TestRbfChannelActiveTransitions(t *testing.T) {
 		require.Equal(
 			t, remoteAddr,
 			currentState.ShutdownScripts.RemoteDeliveryScript,
+		)
+
+		require.Equal(
+			t, localCustomRecords,
+			currentState.ShutdownCustomRecords.LocalCustomRecords,
+		)
+		require.Equal(
+			t, remoteCustomRecords,
+			currentState.ShutdownCustomRecords.RemoteCustomRecords,
 		)
 	})
 
@@ -1060,6 +1108,10 @@ func TestRbfShutdownPendingTransitions(t *testing.T) {
 			LocalDeliveryScript:  localAddr,
 			RemoteDeliveryScript: remoteAddr,
 		}
+		firstState.ShutdownCustomRecords = ShutdownCustomRecords{
+			LocalCustomRecords:  localCustomRecords,
+			RemoteCustomRecords: remoteCustomRecords,
+		}
 
 		closeHarness := newCloser(t, &harnessCfg{
 			initialState: fn.Some[ProtocolState](
@@ -1078,7 +1130,10 @@ func TestRbfShutdownPendingTransitions(t *testing.T) {
 		// We'll send in a shutdown received event, with the expected
 		// co-op close addr.
 		closeHarness.chanCloser.SendEvent(
-			ctx, &ShutdownReceived{ShutdownScript: remoteAddr},
+			ctx, &ShutdownReceived{
+				ShutdownScript: remoteAddr,
+				CustomRecords:  remoteCustomRecords,
+			},
 		)
 
 		// We should transition to the channel flushing state.
@@ -1090,6 +1145,8 @@ func TestRbfShutdownPendingTransitions(t *testing.T) {
 
 		require.Equal(t, localAddr, currentState.LocalDeliveryScript)
 		require.Equal(t, remoteAddr, currentState.RemoteDeliveryScript)
+		require.Equal(t, localCustomRecords, currentState.LocalCustomRecords)
+		require.Equal(t, remoteCustomRecords, currentState.RemoteCustomRecords)
 		require.Equal(
 			t, firstState.IdealFeeRate, currentState.IdealFeeRate,
 		)
@@ -1106,6 +1163,10 @@ func TestRbfShutdownPendingTransitions(t *testing.T) {
 		firstState.ShutdownScripts = ShutdownScripts{
 			LocalDeliveryScript:  localAddr,
 			RemoteDeliveryScript: remoteAddr,
+		}
+		firstState.ShutdownCustomRecords = ShutdownCustomRecords{
+			LocalCustomRecords:  localCustomRecords,
+			RemoteCustomRecords: remoteCustomRecords,
 		}
 
 		closeHarness := newCloser(t, &harnessCfg{
@@ -1137,6 +1198,10 @@ func TestRbfShutdownPendingTransitions(t *testing.T) {
 		firstState.ShutdownScripts = ShutdownScripts{
 			LocalDeliveryScript:  localAddr,
 			RemoteDeliveryScript: remoteAddr,
+		}
+		firstState.ShutdownCustomRecords = ShutdownCustomRecords{
+			LocalCustomRecords:  localCustomRecords,
+			RemoteCustomRecords: remoteCustomRecords,
 		}
 
 		closeHarness := newCloser(t, &harnessCfg{
@@ -1184,6 +1249,10 @@ func TestRbfShutdownPendingTransitions(t *testing.T) {
 		firstState.ShutdownScripts = ShutdownScripts{
 			LocalDeliveryScript:  localAddr,
 			RemoteDeliveryScript: remoteAddr,
+		}
+		firstState.ShutdownCustomRecords = ShutdownCustomRecords{
+			LocalCustomRecords:  localCustomRecords,
+			RemoteCustomRecords: remoteCustomRecords,
 		}
 
 		closeHarness := newCloser(t, &harnessCfg{
@@ -1244,6 +1313,10 @@ func TestRbfChannelFlushingTransitions(t *testing.T) {
 		ShutdownScripts: ShutdownScripts{
 			LocalDeliveryScript:  localAddr,
 			RemoteDeliveryScript: remoteAddr,
+		},
+		ShutdownCustomRecords: ShutdownCustomRecords{
+			LocalCustomRecords:  localCustomRecords,
+			RemoteCustomRecords: remoteCustomRecords,
 		},
 	}
 
@@ -1428,6 +1501,10 @@ func TestRbfCloseClosingNegotiationLocal(t *testing.T) {
 		ShutdownScripts: ShutdownScripts{
 			LocalDeliveryScript:  localAddr,
 			RemoteDeliveryScript: remoteAddr,
+		},
+		ShutdownCustomRecords: ShutdownCustomRecords{
+			LocalCustomRecords:  localCustomRecords,
+			RemoteCustomRecords: remoteCustomRecords,
 		},
 	}
 	startingState := &ClosingNegotiation{
@@ -1710,6 +1787,10 @@ func TestRbfCloseClosingNegotiationRemote(t *testing.T) {
 			LocalDeliveryScript:  localAddr,
 			RemoteDeliveryScript: remoteAddr,
 		},
+		ShutdownCustomRecords: ShutdownCustomRecords{
+			LocalCustomRecords:  localCustomRecords,
+			RemoteCustomRecords: remoteCustomRecords,
+		},
 	}
 	startingState := &ClosingNegotiation{
 		PeerState: lntypes.Dual[AsymmetricPeerState]{
@@ -1983,6 +2064,10 @@ func TestRbfCloseErr(t *testing.T) {
 			LocalDeliveryScript:  localAddr,
 			RemoteDeliveryScript: remoteAddr,
 		},
+		ShutdownCustomRecords: ShutdownCustomRecords{
+			LocalCustomRecords:  localCustomRecords,
+			RemoteCustomRecords: remoteCustomRecords,
+		},
 	}
 	startingState := &ClosingNegotiation{
 		PeerState: lntypes.Dual[AsymmetricPeerState]{
@@ -2062,3 +2147,5 @@ func TestRbfCloseErr(t *testing.T) {
 	// Sending a Spend event should transition to CloseFin.
 	assertSpendEventCloseFin(t, startingState)
 }
+
+// Need more checks?

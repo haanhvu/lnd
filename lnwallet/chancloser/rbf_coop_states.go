@@ -406,7 +406,7 @@ func (e *Environment) CloseOutput(deliveryScript lnwire.DeliveryAddress,
 	})
 }
 
-func (e *Environment) ShutdownCustomRecords() (lnwire.CustomRecords, error) {
+func (e *Environment) ShutdownCustomRecords(isInitiator bool) (lnwire.CustomRecords, error) {
 	var shutdownCustomRecords lnwire.CustomRecords
 
 	err := fn.MapOptionZ(e.AuxCloser, func(a AuxChanCloser) error {
@@ -414,7 +414,7 @@ func (e *Environment) ShutdownCustomRecords() (lnwire.CustomRecords, error) {
 			types.AuxShutdownReq{
 				ChanPoint:   e.ChanPoint,
 				ShortChanID: e.Scid,
-				Initiator:   e.Channel.IsInitiator(),
+				Initiator:   isInitiator,
 				InternalKey: e.LocalInternalKey,
 				CommitBlob:  e.Channel.LocalCommitmentBlob(),
 				FundingBlob: e.Channel.FundingBlob(),
