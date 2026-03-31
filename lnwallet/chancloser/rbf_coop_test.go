@@ -185,6 +185,8 @@ func assertSpendEventCloseFin(t *testing.T, startingState ProtocolState) {
 		)
 
 		closeHarness.assertStateTransitions(&CloseFin{})
+
+		// Need to check for AuxCloseOutput in last case CloseFin?
 	})
 }
 
@@ -515,6 +517,8 @@ func (r *rbfCloserTestHarness) assertLocalClosePending() {
 	require.True(r.T, ok)
 
 	require.Equal(r.T, closeTx, closePendingState.CloseTx)
+	// Check for value later
+	require.NotNil(r.T, closePendingState.AuxOutputs)
 }
 
 type dustExpectation uint
@@ -647,6 +651,8 @@ func (r *rbfCloserTestHarness) expectHalfSignerIteration(
 	// properly stashed in the state.
 	require.Equal(r.T, absoluteFee, offerSentState.ProposedFee)
 	require.Equal(r.T, localSigWire, offerSentState.LocalSig)
+	// Check for real value later
+	require.NotNil(r.T, offerSentState.AuxOutputs)
 }
 
 func (r *rbfCloserTestHarness) assertSingleRbfIteration(
@@ -741,6 +747,8 @@ func (r *rbfCloserTestHarness) assertSingleRemoteRbfIteration(
 	// The proposed fee, as well as our local signature should be properly
 	// stashed in the state.
 	require.Equal(r.T, closeTx, pendingState.CloseTx)
+
+	// Check for AuxCloseOutput later, AuxCloseOutput not exists in every case (only exists in RemoteClose)
 }
 
 func assertStateT[T ProtocolState](h *rbfCloserTestHarness) T {
@@ -761,6 +769,7 @@ func (m *mockAuxChanCloser) ShutdownBlob(
 	return fn.Some[lnwire.CustomRecords](localCustomRecords), nil
 }
 
+// Continue here
 func (m *mockAuxChanCloser) AuxCloseOutputs(
 	desc types.AuxCloseDesc) (fn.Option[AuxCloseOutputs], error) {
 
@@ -1185,6 +1194,11 @@ func TestRbfShutdownPendingTransitions(t *testing.T) {
 
 		// We should transition to the channel flushing state.
 		closeHarness.assertStateTransitions(&ChannelFlushing{})
+
+		currentState := assertStateT[*ChannelFlushing](closeHarness)
+
+		require.Equal(t, localCustomRecords, currentState.LocalCustomRecords)
+		require.Equal(t, remoteCustomRecords, currentState.RemoteCustomRecords)
 	})
 
 	// If we an early offer from the remote party, then we should stash
@@ -1235,7 +1249,10 @@ func TestRbfShutdownPendingTransitions(t *testing.T) {
 		// If we get the current state, we should see that the offer is
 		// cached.
 		currentState := assertStateT[*ChannelFlushing](closeHarness)
+
 		require.NotNil(t, currentState.EarlyRemoteOffer)
+		require.Equal(t, localCustomRecords, currentState.LocalCustomRecords)
+		require.Equal(t, remoteCustomRecords, currentState.RemoteCustomRecords)
 	})
 
 	// If we an early offer from the remote party, then we should stash
@@ -1251,8 +1268,7 @@ func TestRbfShutdownPendingTransitions(t *testing.T) {
 			RemoteDeliveryScript: remoteAddr,
 		}
 		firstState.ShutdownCustomRecords = ShutdownCustomRecords{
-			LocalCustomRecords:  localCustomRecords,
-			RemoteCustomRecords: remoteCustomRecords,
+			LocalCustomRecords: localCustomRecords,
 		}
 
 		closeHarness := newCloser(t, &harnessCfg{
@@ -1275,7 +1291,9 @@ func TestRbfShutdownPendingTransitions(t *testing.T) {
 		closeHarness.assertStateTransitions(&ShutdownPending{})
 
 		// Next, we'll send in a shutdown complete event.
-		closeHarness.chanCloser.SendEvent(ctx, &ShutdownReceived{})
+		closeHarness.chanCloser.SendEvent(ctx, &ShutdownReceived{
+			CustomRecords: remoteCustomRecords,
+		})
 
 		// We should transition to the channel flushing state, then the
 		// self event to have this state cache he early offer should
@@ -1287,7 +1305,10 @@ func TestRbfShutdownPendingTransitions(t *testing.T) {
 		// If we get the current state, we should see that the offer is
 		// cached.
 		currentState := assertStateT[*ChannelFlushing](closeHarness)
+
 		require.NotNil(t, currentState.EarlyRemoteOffer)
+		require.Equal(t, localCustomRecords, currentState.LocalCustomRecords)
+		require.Equal(t, remoteCustomRecords, currentState.RemoteCustomRecords)
 	})
 
 	// Any other event should be ignored.
@@ -1369,6 +1390,12 @@ func TestRbfChannelFlushingTransitions(t *testing.T) {
 			closeHarness.assertStateTransitions(
 				&ClosingNegotiation{},
 			)
+
+			currentState := assertStateT[*ClosingNegotiation](closeHarness)
+
+			require.NotNil(t, currentState.CloseChannelTerms)
+			require.Equal(t, localCustomRecords, currentState.CloseChannelTerms.ShutdownCustomRecords.LocalCustomRecords)
+			require.Equal(t, remoteCustomRecords, currentState.CloseChannelTerms.ShutdownCustomRecords.RemoteCustomRecords)
 		})
 	}
 
@@ -1756,6 +1783,7 @@ func TestRbfCloseClosingNegotiationLocal(t *testing.T) {
 		require.IsType(
 			t, &ErrStateCantPayForFee{}, closeErrState.ErrState,
 		)
+		require.NotNil(t, closeErrState.AuxOutputs)
 	})
 
 	// Any other event should be ignored.
