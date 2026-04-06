@@ -3843,8 +3843,11 @@ func (p *Brontide) observeRbfCloseUpdates(chanCloser *chancloser.RbfChanCloser,
 				closingTxid := closeState.ConfirmedTx.TxHash()
 				if closeReq != nil {
 					closeReq.Updates <- &ChannelCloseUpdate{
-						ClosingTxid: closingTxid[:],
-						Success:     true,
+						ClosingTxid:       closingTxid[:],
+						Success:           true,
+						LocalCloseOutput:  closeState.LocalCloseOutput,
+						RemoteCloseOutput: closeState.RemoteCloseOutput,
+						AuxOutputs:        closeState.AuxOutputs,
 					}
 				}
 				chanID := lnwire.NewChanIDFromOutPoint(
@@ -4059,6 +4062,7 @@ func (p *Brontide) initRbfChanCloser(
 			return p.genDeliveryScript()
 		},
 		FeeEstimator: &chancloser.SimpleCoopFeeEstimator{},
+		AuxCloser:    p.cfg.AuxChanCloser,
 		CloseSigner:  channel,
 		ChanObserver: newChanObserver(
 			channel, link, p.cfg.ChanStatusMgr,
@@ -4072,6 +4076,20 @@ func (p *Brontide) initRbfChanCloser(
 		env.LocalMusigSession = NewMusigChanCloser(channel)
 		env.RemoteMusigSession = NewMusigChanCloser(channel)
 	}
+
+	shutdownAddr, err := env.LocalUpfrontShutdown.UnwrapOrFuncErr(
+		env.NewDeliveryScript,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	addrWithInternalKey, err := p.addrWithInternalKey(shutdownAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	env.LocalInternalKey = addrWithInternalKey.InternalKey
 
 	spendEvent := protofsm.RegisterSpend[chancloser.ProtocolEvent]{
 		OutPoint:   channel.ChannelPoint(),
