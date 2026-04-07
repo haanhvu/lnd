@@ -427,11 +427,12 @@ func (e *Environment) AuxCloseOutputs(closeFee btcutil.Amount,
 
 func (e *Environment) CloseOutput(deliveryScript lnwire.DeliveryAddress,
 	shutdownCustomRecords lnwire.CustomRecords) fn.Option[types.CloseOutput] {
-	_, dustAmt := e.Channel.LocalBalanceDust()
-	localBalance, _ := e.Channel.CommitBalances()
+	// Need to fix later
+	//_, dustAmt := e.Channel.LocalBalanceDust()
+	//localBalance, _ := e.Channel.CommitBalances()
 	return fn.Some(types.CloseOutput{
-		Amt:             localBalance,
-		DustLimit:       dustAmt,
+		//Amt: localBalance,
+		//DustLimit:       dustAmt,
 		PkScript:        deliveryScript,
 		ShutdownRecords: shutdownCustomRecords,
 	})
