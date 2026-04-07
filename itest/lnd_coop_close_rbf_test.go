@@ -138,6 +138,9 @@ func runRbfCoopCloseTest(st *lntest.HarnessTest,
 	// closing transaction has confirmed.
 	aliceClosingTxid := st.WaitForChannelCloseEvent(aliceCloseStream)
 	st.AssertTxInBlock(block, aliceClosingTxid)
+
+	tx := st.Miner().GetRawTransaction(aliceClosingTxid)
+	require.Equal(st, 3, len(tx.MsgTx().TxOut))
 }
 
 func testCoopCloseRbf(ht *lntest.HarnessTest) {
