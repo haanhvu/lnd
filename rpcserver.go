@@ -2754,35 +2754,18 @@ func (r *rpcServer) BatchOpenChannel(ctx context.Context,
 	}, nil
 }
 
-type mockAuxChanCloser struct{}
-
-func (m *mockAuxChanCloser) ShutdownBlob(
-	req types.AuxShutdownReq,
-) (fn.Option[lnwire.CustomRecords], error) {
-
-	return fn.Some[lnwire.CustomRecords](lnwire.CustomRecords{
-		0: []byte("local"),
-	}), nil
-}
-
-func (m *mockAuxChanCloser) AuxCloseOutputs(
-	desc types.AuxCloseDesc) (fn.Option[chancloser.AuxCloseOutputs], error) {
-
-	// Implement later
-	return fn.None[chancloser.AuxCloseOutputs](), nil
-}
-
-func (m *mockAuxChanCloser) FinalizeClose(desc types.AuxCloseDesc,
-	closeTx *wire.MsgTx) error {
-
-	return nil
-}
-
 // CloseChannel attempts to close an active channel identified by its channel
 // point. The actions of this method can additionally be augmented to attempt
 // a force close after a timeout period in the case of an inactive peer.
 func (r *rpcServer) CloseChannel(in *lnrpc.CloseChannelRequest,
 	updateStream lnrpc.Lightning_CloseChannelServer) error {
+
+	/*err := fn.MapOptionZ(r.implCfg.AuxChanCloser, func(aux chancloser.AuxChanCloser) error {
+		return ErrServerNotActive
+	})
+	if err != nil {
+		return err
+	}*/
 
 	if !r.server.Started() {
 		return ErrServerNotActive

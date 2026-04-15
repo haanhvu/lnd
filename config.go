@@ -22,6 +22,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/wire"
 	flags "github.com/jessevdk/go-flags"
 	"github.com/lightninglabs/neutrino"
 	"github.com/lightningnetwork/lnd/autopilot"
@@ -43,6 +44,7 @@ import (
 	"github.com/lightningnetwork/lnd/lnutils"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwallet/chancloser"
+	"github.com/lightningnetwork/lnd/lnwallet/types"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/onionmessage"
 	"github.com/lightningnetwork/lnd/routing"
@@ -1975,6 +1977,29 @@ func (c *Config) ImplementationConfig(
 	implCfg.AuxChanCloser = fn.Some[chancloser.AuxChanCloser](&mockAuxChanCloser{})
 
 	return implCfg
+}
+
+type mockAuxChanCloser struct{}
+
+func (m *mockAuxChanCloser) ShutdownBlob(
+	req types.AuxShutdownReq,
+) (fn.Option[lnwire.CustomRecords], error) {
+
+	return fn.Some[lnwire.CustomRecords](lnwire.CustomRecords{
+		0: []byte("local"),
+	}), nil
+}
+
+func (m *mockAuxChanCloser) AuxCloseOutputs(
+	desc types.AuxCloseDesc) (fn.Option[chancloser.AuxCloseOutputs], error) {
+
+	return fn.None[chancloser.AuxCloseOutputs](), nil
+}
+
+func (m *mockAuxChanCloser) FinalizeClose(desc types.AuxCloseDesc,
+	closeTx *wire.MsgTx) error {
+
+	return nil
 }
 
 // CleanAndExpandPath expands environment variables and leading ~ in the
