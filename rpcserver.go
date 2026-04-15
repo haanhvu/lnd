@@ -683,6 +683,8 @@ func newRPCServer(cfg *Config, interceptorChain *rpcperms.InterceptorChain,
 		)
 	}
 
+	//implCfg.AuxChanCloser = fn.Some[chancloser.AuxChanCloser](&mockAuxChanCloser{})
+
 	return &rpcServer{
 		cfg:              cfg,
 		subGrpcHandlers:  subServerHandlers,
@@ -2781,8 +2783,6 @@ func (m *mockAuxChanCloser) FinalizeClose(desc types.AuxCloseDesc,
 // a force close after a timeout period in the case of an inactive peer.
 func (r *rpcServer) CloseChannel(in *lnrpc.CloseChannelRequest,
 	updateStream lnrpc.Lightning_CloseChannelServer) error {
-
-	r.implCfg.AuxChanCloser = fn.Some[chancloser.AuxChanCloser](&mockAuxChanCloser{})
 
 	if !r.server.Started() {
 		return ErrServerNotActive
