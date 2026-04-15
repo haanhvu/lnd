@@ -567,7 +567,13 @@ func (h HarnessTest) WaitForChannelCloseEvent(
 	require.NoError(h, err)
 
 	resp, ok := event.Update.(*lnrpc.CloseStatusUpdate_ChanClose)
-	require.GreaterOrEqual(h, len(resp.ChanClose.AdditionalOutputs), 0)
+	require.NotNil(h, resp.ChanClose.ClosingTxid)
+	require.NotNil(h, resp.ChanClose.Success)
+	//require.NotNil(h, resp.ChanClose.AdditionalOutputs)
+
+	//require.NotNil(h, resp.ChanClose.LocalCloseOutput)
+	//require.NotNil(h, resp.ChanClose.RemoteCloseOutput)
+	//require.GreaterOrEqual(h, len(resp.ChanClose.AdditionalOutputs), 1)
 	require.Truef(
 		h, ok, "expected channel close update, instead got %T: %v",
 		event.Update, spew.Sdump(event.Update),

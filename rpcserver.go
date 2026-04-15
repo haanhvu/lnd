@@ -693,6 +693,10 @@ func newRPCServer(cfg *Config, interceptorChain *rpcperms.InterceptorChain,
 	}
 }
 
+func (r *rpcServer) SetImplementationCfg(implCfg *ImplementationCfg) {
+	r.implCfg = implCfg
+}
+
 // addDeps populates all dependencies needed by the RPC server, and any
 // of the sub-servers that it maintains. When this is done, the RPC server can
 // be started, and start accepting RPC calls.
@@ -2748,11 +2752,37 @@ func (r *rpcServer) BatchOpenChannel(ctx context.Context,
 	}, nil
 }
 
+type mockAuxChanCloser struct{}
+
+func (m *mockAuxChanCloser) ShutdownBlob(
+	req types.AuxShutdownReq,
+) (fn.Option[lnwire.CustomRecords], error) {
+
+	return fn.Some[lnwire.CustomRecords](lnwire.CustomRecords{
+		0: []byte("local"),
+	}), nil
+}
+
+func (m *mockAuxChanCloser) AuxCloseOutputs(
+	desc types.AuxCloseDesc) (fn.Option[chancloser.AuxCloseOutputs], error) {
+
+	// Implement later
+	return fn.None[chancloser.AuxCloseOutputs](), nil
+}
+
+func (m *mockAuxChanCloser) FinalizeClose(desc types.AuxCloseDesc,
+	closeTx *wire.MsgTx) error {
+
+	return nil
+}
+
 // CloseChannel attempts to close an active channel identified by its channel
 // point. The actions of this method can additionally be augmented to attempt
 // a force close after a timeout period in the case of an inactive peer.
 func (r *rpcServer) CloseChannel(in *lnrpc.CloseChannelRequest,
 	updateStream lnrpc.Lightning_CloseChannelServer) error {
+
+	r.implCfg.AuxChanCloser = fn.Some[chancloser.AuxChanCloser](&mockAuxChanCloser{})
 
 	if !r.server.Started() {
 		return ErrServerNotActive
