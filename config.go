@@ -29,6 +29,7 @@ import (
 	"github.com/lightningnetwork/lnd/chanbackup"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/discovery"
+	"github.com/lightningnetwork/lnd/fn/v2"
 	"github.com/lightningnetwork/lnd/funding"
 	"github.com/lightningnetwork/lnd/htlcswitch"
 	"github.com/lightningnetwork/lnd/htlcswitch/hodl"
@@ -40,6 +41,7 @@ import (
 	"github.com/lightningnetwork/lnd/lnrpc/signrpc"
 	"github.com/lightningnetwork/lnd/lnutils"
 	"github.com/lightningnetwork/lnd/lnwallet"
+	"github.com/lightningnetwork/lnd/lnwallet/chancloser"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/routing"
 	"github.com/lightningnetwork/lnd/signal"
@@ -1874,7 +1876,8 @@ func (c *Config) ImplementationConfig(
 			c, ltndLog, interceptor,
 			c.RemoteSigner.MigrateWatchOnly,
 		)
-		return &ImplementationCfg{
+
+		implCfg := &ImplementationCfg{
 			GrpcRegistrar:     rpcImpl,
 			RestRegistrar:     rpcImpl,
 			ExternalValidator: rpcImpl,
@@ -1884,10 +1887,14 @@ func (c *Config) ImplementationConfig(
 			WalletConfigBuilder: rpcImpl,
 			ChainControlBuilder: rpcImpl,
 		}
+
+		implCfg.AuxChanCloser = fn.Some[chancloser.AuxChanCloser](&mockAuxChanCloser{})
+
+		return implCfg
 	}
 
 	defaultImpl := NewDefaultWalletImpl(c, ltndLog, interceptor, false)
-	return &ImplementationCfg{
+	implCfg := &ImplementationCfg{
 		GrpcRegistrar:       defaultImpl,
 		RestRegistrar:       defaultImpl,
 		ExternalValidator:   defaultImpl,
@@ -1895,6 +1902,9 @@ func (c *Config) ImplementationConfig(
 		WalletConfigBuilder: defaultImpl,
 		ChainControlBuilder: defaultImpl,
 	}
+	implCfg.AuxChanCloser = fn.Some[chancloser.AuxChanCloser](&mockAuxChanCloser{})
+
+	return implCfg
 }
 
 // CleanAndExpandPath expands environment variables and leading ~ in the
