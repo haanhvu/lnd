@@ -399,14 +399,14 @@ func (e *Environment) AuxCloseOutputs(closeFee btcutil.Amount,
 			ChanPoint:   e.ChanPoint,
 			ShortChanID: e.Scid,
 			InternalKey: e.LocalInternalKey,
-			Initiator:   e.Channel.IsInitiator(),
-			CommitBlob:  e.Channel.LocalCommitmentBlob(),
-			FundingBlob: e.Channel.FundingBlob(),
+			//Initiator:   e.Channel.IsInitiator(),
+			//CommitBlob:  e.Channel.LocalCommitmentBlob(),
+			//FundingBlob: e.Channel.FundingBlob(),
 		}
 		outs, err := aux.AuxCloseOutputs(types.AuxCloseDesc{
-			AuxShutdownReq:    req,
-			CloseFee:          closeFee,
-			CommitFee:         e.Channel.CommitFee(),
+			AuxShutdownReq: req,
+			CloseFee:       closeFee,
+			//CommitFee:         e.Channel.CommitFee(),
 			LocalCloseOutput:  localCloseOutput,
 			RemoteCloseOutput: remoteCloseOutput,
 		})
@@ -448,8 +448,8 @@ func (e *Environment) ShutdownCustomRecords(isInitiator bool) (lnwire.CustomReco
 				ShortChanID: e.Scid,
 				Initiator:   isInitiator,
 				InternalKey: e.LocalInternalKey,
-				CommitBlob:  e.Channel.LocalCommitmentBlob(),
-				FundingBlob: e.Channel.FundingBlob(),
+				//CommitBlob:  e.Channel.LocalCommitmentBlob(),
+				//FundingBlob: e.Channel.FundingBlob(),
 			},
 		)
 		if err != nil {
