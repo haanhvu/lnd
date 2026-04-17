@@ -17,6 +17,7 @@ import (
 	"github.com/lightningnetwork/lnd/lnwallet/types"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/protofsm"
+	"github.com/lightningnetwork/lnd/tlv"
 )
 
 var (
@@ -352,7 +353,17 @@ type Environment struct {
 
 	LocalInternalKey fn.Option[btcec.PublicKey]
 
-	Channel Channel
+	FundingBlob fn.Option[tlv.Blob]
+
+	CommitBlob fn.Option[tlv.Blob]
+
+	DustLimit btcutil.Amount
+
+	Amt btcutil.Amount
+
+	CommitFee btcutil.Amount
+
+	Initiator bool
 
 	// ChanObserver is an interface used to observe state changes to the
 	// channel. We'll use this to figure out when/if we can send certain
@@ -399,14 +410,14 @@ func (e *Environment) AuxCloseOutputs(closeFee btcutil.Amount,
 			ChanPoint:   e.ChanPoint,
 			ShortChanID: e.Scid,
 			InternalKey: e.LocalInternalKey,
-			//Initiator:   e.Channel.IsInitiator(),
-			//CommitBlob:  e.Channel.LocalCommitmentBlob(),
-			//FundingBlob: e.Channel.FundingBlob(),
+			Initiator:   e.Initiator,
+			CommitBlob:  e.CommitBlob,
+			FundingBlob: e.FundingBlob,
 		}
 		outs, err := aux.AuxCloseOutputs(types.AuxCloseDesc{
-			AuxShutdownReq: req,
-			CloseFee:       closeFee,
-			//CommitFee:         e.Channel.CommitFee(),
+			AuxShutdownReq:    req,
+			CloseFee:          closeFee,
+			CommitFee:         e.CommitFee,
 			LocalCloseOutput:  localCloseOutput,
 			RemoteCloseOutput: remoteCloseOutput,
 		})
@@ -427,12 +438,9 @@ func (e *Environment) AuxCloseOutputs(closeFee btcutil.Amount,
 
 func (e *Environment) CloseOutput(deliveryScript lnwire.DeliveryAddress,
 	shutdownCustomRecords lnwire.CustomRecords) fn.Option[types.CloseOutput] {
-	// Need to fix later
-	//_, dustAmt := e.Channel.LocalBalanceDust()
-	//localBalance, _ := e.Channel.CommitBalances()
 	return fn.Some(types.CloseOutput{
-		//Amt: localBalance,
-		//DustLimit:       dustAmt,
+		Amt:             e.Amt,
+		DustLimit:       e.DustLimit,
 		PkScript:        deliveryScript,
 		ShutdownRecords: shutdownCustomRecords,
 	})
@@ -448,8 +456,8 @@ func (e *Environment) ShutdownCustomRecords(isInitiator bool) (lnwire.CustomReco
 				ShortChanID: e.Scid,
 				Initiator:   isInitiator,
 				InternalKey: e.LocalInternalKey,
-				//CommitBlob:  e.Channel.LocalCommitmentBlob(),
-				//FundingBlob: e.Channel.FundingBlob(),
+				CommitBlob:  e.CommitBlob,
+				FundingBlob: e.FundingBlob,
 			},
 		)
 		if err != nil {

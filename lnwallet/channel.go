@@ -9736,6 +9736,7 @@ func CreateCooperativeCloseTx(fundingTxIn wire.TxIn,
 		remoteOutputIdx = fn.Some(len(closeTx.TxOut) - 1)
 	}
 
+	// So here's the problem
 	// If we have extra outputs to add to the co-op close transaction, then
 	// we'll examine them now. We'll deduct the output's value from the
 	// owning party. In the case that a party can't pay for the output, then

@@ -1039,9 +1039,10 @@ func newRbfCloserTestHarness(t *testing.T,
 		NewDeliveryScript:     harness.newAddrFunc,
 		FeeEstimator:          feeEstimator,
 		AuxCloser:             fn.Some[AuxChanCloser](&mockAuxChanCloser{}),
-		Channel:               &mockChannel{},
-		ChanObserver:          mockObserver,
-		CloseSigner:           mockSigner,
+		// TODO: Replace with needed fields to fix unit tests
+		//Channel:               &mockChannel{},
+		ChanObserver: mockObserver,
+		CloseSigner:  mockSigner,
 	}
 
 	// If musig sessions are provided, we set them in the environment.

@@ -4235,11 +4235,21 @@ func (p *Brontide) initRbfChanCloser(
 		},
 		FeeEstimator: &chancloser.SimpleCoopFeeEstimator{},
 		AuxCloser:    p.cfg.AuxChanCloser,
+		FundingBlob:  channel.FundingBlob(),
+		CommitBlob:   channel.LocalCommitmentBlob(),
+		CommitFee:    channel.CommitFee(),
+		Initiator:    channel.IsInitiator(),
 		CloseSigner:  channel,
 		ChanObserver: newChanObserver(
 			channel, link, p.cfg.ChanStatusMgr,
 		),
 	}
+
+	_, dustAmt := channel.LocalBalanceDust()
+	env.DustLimit = dustAmt
+
+	localBalance, _ := channel.CommitBalances()
+	env.Amt = localBalance
 
 	// For taproot channels, we need to set both LocalMusigSession and
 	// RemoteMusigSession to handle nonce exchange during RBF cooperative

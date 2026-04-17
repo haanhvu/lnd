@@ -1985,15 +1985,24 @@ func (m *mockAuxChanCloser) ShutdownBlob(
 	req types.AuxShutdownReq,
 ) (fn.Option[lnwire.CustomRecords], error) {
 
-	return fn.Some[lnwire.CustomRecords](lnwire.CustomRecords{
-		0: []byte("local"),
-	}), nil
+	return fn.None[lnwire.CustomRecords](), nil
 }
 
 func (m *mockAuxChanCloser) AuxCloseOutputs(
 	desc types.AuxCloseDesc) (fn.Option[chancloser.AuxCloseOutputs], error) {
-
-	return fn.None[chancloser.AuxCloseOutputs](), nil
+	return fn.Some[chancloser.AuxCloseOutputs](
+		chancloser.AuxCloseOutputs{
+			ExtraCloseOutputs: []lnwallet.CloseOutput{
+				{
+					TxOut: wire.TxOut{
+						Value:    50_000,
+						PkScript: []byte{0x51},
+					},
+					IsLocal: desc.Initiator,
+				},
+			},
+		},
+	), nil
 }
 
 func (m *mockAuxChanCloser) FinalizeClose(desc types.AuxCloseDesc,
