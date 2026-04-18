@@ -1995,8 +1995,12 @@ func (m *mockAuxChanCloser) AuxCloseOutputs(
 			ExtraCloseOutputs: []lnwallet.CloseOutput{
 				{
 					TxOut: wire.TxOut{
-						Value:    50_000,
-						PkScript: []byte{0x51},
+						Value: 50_000,
+						PkScript: []byte{
+							0x00, 0x14,
+							0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+							0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+						},
 					},
 					IsLocal: desc.Initiator,
 				},
