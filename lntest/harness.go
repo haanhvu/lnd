@@ -370,6 +370,8 @@ func (h *HarnessTest) Subtest(t *testing.T) *HarnessTest {
 		// If found running nodes, shut them down.
 		st.shutdownAllNodes()
 
+		//st.miner.GenerateBlocks(1)
+
 		// We require the mempool to be cleaned from the test.
 		require.Empty(st, st.miner.GetRawMempool(), "mempool not "+
 			"cleaned, please mine blocks to clean them all.")
