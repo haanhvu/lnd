@@ -406,7 +406,7 @@ func (e *Environment) AuxCloseOutputs(closeFee btcutil.Amount,
 
 	var closeOuts fn.Option[AuxCloseOutputs]
 	err := fn.MapOptionZ(e.AuxCloser, func(aux AuxChanCloser) error {
-		req := types.AuxShutdownReq{
+		/*req := types.AuxShutdownReq{
 			ChanPoint:   e.ChanPoint,
 			ShortChanID: e.Scid,
 			InternalKey: e.LocalInternalKey,
@@ -425,7 +425,7 @@ func (e *Environment) AuxCloseOutputs(closeFee btcutil.Amount,
 			return err
 		}
 
-		closeOuts = outs
+		closeOuts = outs*/
 
 		return nil
 	})

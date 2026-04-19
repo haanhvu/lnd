@@ -89,7 +89,8 @@ func runRbfCoopCloseTest(st *lntest.HarnessTest,
 	_, aliceCloseUpdate = st.CloseChannelAssertPending(
 		alice, chanPoint, false,
 		lntest.WithCoopCloseFeeRate(aliceRejectedFeeRate),
-		lntest.WithLocalTxNotify(), lntest.WithSkipMempoolCheck(),
+		lntest.WithLocalTxNotify(),
+		lntest.WithSkipMempoolCheck(),
 	)
 	alicePendingUpdate = aliceCloseUpdate.GetClosePending()
 	require.NotNil(st, aliceCloseUpdate)
@@ -114,6 +115,7 @@ func runRbfCoopCloseTest(st *lntest.HarnessTest,
 
 	// At this point, we'll have Alice+Bob reconnect so we can ensure that
 	// we can continue to do RBF bumps even after a reconnection.
+	//st.CleanMempool()
 	st.DisconnectNodes(alice, bob)
 	st.ConnectNodes(alice, bob)
 
@@ -144,8 +146,8 @@ func runRbfCoopCloseTest(st *lntest.HarnessTest,
 	aliceClosingTxid := st.WaitForChannelCloseEvent(aliceCloseStream)
 	st.AssertTxInBlock(block, aliceClosingTxid)
 
-	/*tx = st.Miner().GetRawTransaction(aliceClosingTxid)
-	require.Equal(st, 3, len(tx.MsgTx().TxOut))*/
+	tx := st.Miner().GetRawTransaction(aliceClosingTxid)
+	require.Equal(st, 3, len(tx.MsgTx().TxOut))
 }
 
 func testCoopCloseRbf(ht *lntest.HarnessTest) {
@@ -166,6 +168,7 @@ func testCoopCloseRbf(ht *lntest.HarnessTest) {
 
 	for _, chanType := range channelTypes {
 		chanType := chanType
+		ht.CleanMempool()
 		ht.Run(chanType.name, func(t1 *testing.T) {
 			st := ht.Subtest(t1)
 			// Set the fee estimate to 1sat/vbyte. This ensures that

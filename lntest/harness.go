@@ -327,6 +327,8 @@ func (h *HarnessTest) RunTestCase(testCase *TestCase) {
 func (h *HarnessTest) Subtest(t *testing.T) *HarnessTest {
 	t.Helper()
 
+	//h.MineBlocksAndAssertNumTxes(1, 1)
+
 	st := &HarnessTest{
 		T:            t,
 		manager:      h.manager,
@@ -370,7 +372,9 @@ func (h *HarnessTest) Subtest(t *testing.T) *HarnessTest {
 		// If found running nodes, shut them down.
 		st.shutdownAllNodes()
 
-		//st.miner.GenerateBlocks(1)
+		//st.MineBlocks(1)
+
+		//h.MineBlocksAndAssertNumTxes(1, 1)
 
 		// We require the mempool to be cleaned from the test.
 		require.Empty(st, st.miner.GetRawMempool(), "mempool not "+
@@ -1858,7 +1862,7 @@ func (h *HarnessTest) CleanShutDown() {
 	h.shutdownAllNodes()
 
 	// Now mine blocks till the mempool is empty.
-	h.cleanMempool()
+	h.CleanMempool()
 }
 
 // QueryChannelByChanPoint tries to find a channel matching the channel point
