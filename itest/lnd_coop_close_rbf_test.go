@@ -1,11 +1,13 @@
 package itest
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/lntest"
 	"github.com/lightningnetwork/lnd/lntest/node"
@@ -152,6 +154,8 @@ func runRbfCoopCloseTest(st *lntest.HarnessTest,
 	// Both Alice and Bob should trigger a final close update to signal the
 	// closing transaction has confirmed.
 	aliceClosingTxid := st.WaitForChannelCloseEvent(aliceCloseStream)
+	tx = st.Miner().GetRawTransaction(aliceClosingTxid)
+	require.Equal(st, 3, len(tx.MsgTx().TxOut))
 	st.AssertTxInBlock(block, aliceClosingTxid)
 }
 
@@ -222,6 +226,100 @@ func testCoopCloseRbf(ht *lntest.HarnessTest) {
 	}
 }
 
+func testCoopCloseRbfWithAuxCloseOutputs(ht *lntest.HarnessTest) {
+	ht.SetFeeEstimate(250)
+	ht.SetFeeEstimateWithConf(250, 6)
+
+	rbfCoopFlags := []string{"--protocol.rbf-coop-close", "--dev.mock-aux-chan-closer"}
+	params := lntest.OpenChannelParams{
+		Amt:     btcutil.Amount(10_000_000),
+		PushAmt: btcutil.Amount(5_000_000),
+	}
+	cfgs := [][]string{rbfCoopFlags, rbfCoopFlags}
+	chanPoints, nodes := ht.CreateSimpleNetwork(cfgs, params)
+	alice, bob := nodes[0], nodes[1]
+	chanPoint := chanPoints[0]
+
+	aliceFeeRate := chainfee.SatPerVByte(5)
+	aliceCloseStream, aliceCloseUpdate := ht.CloseChannelAssertPending(
+		alice, chanPoint, false,
+		lntest.WithCoopCloseFeeRate(aliceFeeRate),
+		lntest.WithLocalTxNotify(),
+	)
+
+	// Confirm that this new update was at 5 sat/vb.
+	alicePendingUpdate := aliceCloseUpdate.GetClosePending()
+	tx := ht.Miner().GetRawTransaction(chainhash.Hash(alicePendingUpdate.Txid))
+	txOuts := tx.MsgTx().TxOut
+	require.Equal(ht, 3, len(txOuts))
+
+	expectedTxOut := wire.TxOut{
+		Value: 50_000,
+		PkScript: []byte{
+			0x00, 0x14,
+			0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+			0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+		},
+	}
+	contains := false
+	for _, txOut := range txOuts {
+		if txOut.Value == expectedTxOut.Value && bytes.Equal(txOut.PkScript, expectedTxOut.PkScript) {
+			contains = true
+		}
+	}
+	require.True(ht, contains)
+
+	bobFeeRate := aliceFeeRate * 2
+	_, bobCloseUpdate := ht.CloseChannelAssertPending(
+		bob, chanPoint, false, lntest.WithCoopCloseFeeRate(bobFeeRate),
+		lntest.WithLocalTxNotify(),
+	)
+
+	// Confirm that this new update was at 10 sat/vb.
+	bobPendingUpdate := bobCloseUpdate.GetClosePending()
+	tx = ht.Miner().GetRawTransaction(chainhash.Hash(bobPendingUpdate.Txid))
+	require.Equal(ht, 3, len(tx.MsgTx().TxOut))
+	contains = false
+	txOuts = tx.MsgTx().TxOut
+	for _, txOut := range txOuts {
+		if txOut.Value == expectedTxOut.Value && bytes.Equal(txOut.PkScript, expectedTxOut.PkScript) {
+			contains = true
+		}
+	}
+	require.True(ht, contains)
+
+	aliceCloseUpdate, err := ht.ReceiveCloseChannelUpdate(aliceCloseStream)
+	require.NoError(ht, err)
+	alicePendingUpdate = aliceCloseUpdate.GetClosePending()
+	tx = ht.Miner().GetRawTransaction(chainhash.Hash(alicePendingUpdate.Txid))
+	require.Equal(ht, 3, len(tx.MsgTx().TxOut))
+	contains = false
+	txOuts = tx.MsgTx().TxOut
+	for _, txOut := range txOuts {
+		if txOut.Value == expectedTxOut.Value && bytes.Equal(txOut.PkScript, expectedTxOut.PkScript) {
+			contains = true
+		}
+	}
+	require.True(ht, contains)
+
+	block := ht.MineBlocksAndAssertNumTxes(1, 1)[0]
+
+	// Both Alice and Bob should trigger a final close update to signal the
+	// closing transaction has confirmed.
+	aliceClosingTxid := ht.WaitForChannelCloseEvent(aliceCloseStream)
+	tx = ht.Miner().GetRawTransaction(aliceClosingTxid)
+	require.Equal(ht, 3, len(tx.MsgTx().TxOut))
+	contains = false
+	txOuts = tx.MsgTx().TxOut
+	for _, txOut := range txOuts {
+		if txOut.Value == expectedTxOut.Value && bytes.Equal(txOut.PkScript, expectedTxOut.PkScript) {
+			contains = true
+		}
+	}
+	require.True(ht, contains)
+	ht.AssertTxInBlock(block, aliceClosingTxid)
+}
+
 // testRBFCoopCloseDisconnect tests that when a node disconnects that the node
 // is properly disconnected.
 func testRBFCoopCloseDisconnect(ht *lntest.HarnessTest) {
@@ -258,6 +356,7 @@ func testCoopCloseRBFWithReorg(ht *lntest.HarnessTest) {
 	const requiredConfs = 3
 	rbfCoopFlags := []string{
 		"--protocol.rbf-coop-close",
+		// Do something like this?
 		"--dev.force-channel-close-confs=3",
 	}
 

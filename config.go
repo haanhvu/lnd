@@ -1960,7 +1960,10 @@ func (c *Config) ImplementationConfig(
 			ChainControlBuilder: rpcImpl,
 		}
 
-		implCfg.AuxChanCloser = fn.Some[chancloser.AuxChanCloser](&mockAuxChanCloser{})
+		if c.Dev.GetMockAuxChanCloser() {
+			implCfg.AuxChanCloser = c.Dev.GetMockAuxChanCloserForTest()
+		}
+		//implCfg.AuxChanCloser = fn.Some[chancloser.AuxChanCloser](&mockAuxChanCloser{})
 
 		return implCfg
 	}
@@ -1974,7 +1977,10 @@ func (c *Config) ImplementationConfig(
 		WalletConfigBuilder: defaultImpl,
 		ChainControlBuilder: defaultImpl,
 	}
-	implCfg.AuxChanCloser = fn.Some[chancloser.AuxChanCloser](&mockAuxChanCloser{})
+	if c.Dev.GetMockAuxChanCloser() {
+		implCfg.AuxChanCloser = c.Dev.GetMockAuxChanCloserForTest()
+	}
+	//implCfg.AuxChanCloser = fn.Some[chancloser.AuxChanCloser](&mockAuxChanCloser{})
 
 	return implCfg
 }
