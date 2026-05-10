@@ -754,7 +754,6 @@ func (r *rbfCloserTestHarness) expectHalfSignerIteration(
 			},
 			IsLocal: false,
 		})
-
 }
 
 func (r *rbfCloserTestHarness) assertSingleRbfIteration(
