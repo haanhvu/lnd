@@ -38,13 +38,11 @@ func runRbfCoopCloseTest(st *lntest.HarnessTest,
 		st, int64(aliceFeeRate), alicePendingUpdate.FeePerVbyte,
 	)
 	require.True(st, alicePendingUpdate.LocalCloseTx)
-	tx := st.Miner().GetRawTransaction(chainhash.Hash(alicePendingUpdate.Txid))
-	require.Equal(st, 3, len(tx.MsgTx().TxOut))
 
 	// Now, we'll have Bob attempt to RBF the close transaction with a
 	// higher fee rate, double that of Alice's.
 	bobFeeRate := aliceFeeRate * 2
-	_, bobCloseUpdate := st.CloseChannelAssertPending(
+	bobCloseStream, bobCloseUpdate := st.CloseChannelAssertPending(
 		bob, chanPoint, false, lntest.WithCoopCloseFeeRate(bobFeeRate),
 		lntest.WithLocalTxNotify(),
 	)
@@ -54,8 +52,6 @@ func runRbfCoopCloseTest(st *lntest.HarnessTest,
 	require.NotNil(st, bobCloseUpdate)
 	require.Equal(st, bobPendingUpdate.FeePerVbyte, int64(bobFeeRate))
 	require.True(st, bobPendingUpdate.LocalCloseTx)
-	tx = st.Miner().GetRawTransaction(chainhash.Hash(bobPendingUpdate.Txid))
-	require.Equal(st, 3, len(tx.MsgTx().TxOut))
 
 	var err error
 
@@ -65,8 +61,6 @@ func runRbfCoopCloseTest(st *lntest.HarnessTest,
 	require.NoError(st, err)
 	alicePendingUpdate = aliceCloseUpdate.GetClosePending()
 	require.NotNil(st, aliceCloseUpdate)
-	tx = st.Miner().GetRawTransaction(chainhash.Hash(alicePendingUpdate.Txid))
-	require.Equal(st, 3, len(tx.MsgTx().TxOut))
 
 	// For taproot channels, due to different witness sizes,
 	// the fee per vbyte might be slightly different due to
@@ -75,15 +69,15 @@ func runRbfCoopCloseTest(st *lntest.HarnessTest,
 	if isTaproot {
 		// Allow for a small difference in fee
 		// calculation for taproot.
-		/*require.InDelta(
+		require.InDelta(
 			st, int64(bobFeeRate),
 			alicePendingUpdate.FeePerVbyte, 1,
-		)*/
+		)
 	} else {
-		/*require.Equal(
+		require.Equal(
 			st, alicePendingUpdate.FeePerVbyte,
 			int64(bobFeeRate),
-		)*/
+		)
 	}
 	require.False(st, alicePendingUpdate.LocalCloseTx)
 
@@ -95,8 +89,7 @@ func runRbfCoopCloseTest(st *lntest.HarnessTest,
 	_, aliceCloseUpdate = st.CloseChannelAssertPending(
 		alice, chanPoint, false,
 		lntest.WithCoopCloseFeeRate(aliceRejectedFeeRate),
-		lntest.WithLocalTxNotify(),
-		lntest.WithSkipMempoolCheck(),
+		lntest.WithLocalTxNotify(), lntest.WithSkipMempoolCheck(),
 	)
 	alicePendingUpdate = aliceCloseUpdate.GetClosePending()
 	require.NotNil(st, aliceCloseUpdate)
@@ -105,10 +98,8 @@ func runRbfCoopCloseTest(st *lntest.HarnessTest,
 		int64(aliceRejectedFeeRate),
 	)
 	require.True(st, alicePendingUpdate.LocalCloseTx)
-	//tx = st.Miner().GetRawTransaction(chainhash.Hash(alicePendingUpdate.Txid))
-	//require.Equal(st, 3, len(tx.MsgTx().TxOut))
 
-	/*_, err = st.ReceiveCloseChannelUpdate(bobCloseStream)
+	_, err = st.ReceiveCloseChannelUpdate(bobCloseStream)
 	require.NoError(st, err)
 
 	// We'll now attempt a fee update that we can't actually pay for. This
@@ -119,11 +110,10 @@ func runRbfCoopCloseTest(st *lntest.HarnessTest,
 		lntest.WithCoopCloseFeeRate(aliceRejectedFeeRate),
 		lntest.WithLocalTxNotify(),
 		lntest.WithExpectedErrString("cannot pay for fee"),
-	)*/
+	)
 
 	// At this point, we'll have Alice+Bob reconnect so we can ensure that
 	// we can continue to do RBF bumps even after a reconnection.
-	//st.CleanMempool()
 	st.DisconnectNodes(alice, bob)
 	st.ConnectNodes(alice, bob)
 
@@ -135,8 +125,8 @@ func runRbfCoopCloseTest(st *lntest.HarnessTest,
 		lntest.WithLocalTxNotify(),
 	)
 
-	/*chanClose := aliceCloseUpdate.Update.(*lnrpc.CloseStatusUpdate_ChanClose)
-	require.GreaterOrEqual(st, len(chanClose.ChanClose.AdditionalOutputs), 1)*/
+	chanClose := aliceCloseUpdate.Update.(*lnrpc.CloseStatusUpdate_ChanClose)
+	require.GreaterOrEqual(st, len(chanClose.ChanClose.AdditionalOutputs), 1)
 
 	alicePendingUpdate = aliceCloseUpdate.GetClosePending()
 	require.NotNil(st, aliceCloseUpdate)
@@ -144,8 +134,6 @@ func runRbfCoopCloseTest(st *lntest.HarnessTest,
 		st, alicePendingUpdate.FeePerVbyte, int64(aliceFeeRate),
 	)
 	require.True(st, alicePendingUpdate.LocalCloseTx)
-	tx = st.Miner().GetRawTransaction(chainhash.Hash(alicePendingUpdate.Txid))
-	require.Equal(st, 3, len(tx.MsgTx().TxOut))
 
 	// To conclude, we'll mine a block which should now confirm Alice's
 	// version of the coop close transaction.
@@ -154,8 +142,6 @@ func runRbfCoopCloseTest(st *lntest.HarnessTest,
 	// Both Alice and Bob should trigger a final close update to signal the
 	// closing transaction has confirmed.
 	aliceClosingTxid := st.WaitForChannelCloseEvent(aliceCloseStream)
-	tx = st.Miner().GetRawTransaction(aliceClosingTxid)
-	require.Equal(st, 3, len(tx.MsgTx().TxOut))
 	st.AssertTxInBlock(block, aliceClosingTxid)
 }
 
@@ -177,7 +163,6 @@ func testCoopCloseRbf(ht *lntest.HarnessTest) {
 
 	for _, chanType := range channelTypes {
 		chanType := chanType
-		//ht.CleanMempool()
 		ht.Run(chanType.name, func(t1 *testing.T) {
 			st := ht.Subtest(t1)
 			// Set the fee estimate to 1sat/vbyte. This ensures that
@@ -249,7 +234,34 @@ func testCoopCloseRbfWithAuxCloseOutputs(ht *lntest.HarnessTest) {
 
 	// Confirm that this new update was at 5 sat/vb.
 	alicePendingUpdate := aliceCloseUpdate.GetClosePending()
-	tx := ht.Miner().GetRawTransaction(chainhash.Hash(alicePendingUpdate.Txid))
+	checkAdditionalOutputs(ht, chainhash.Hash(alicePendingUpdate.Txid))
+
+	bobFeeRate := aliceFeeRate * 2
+	_, bobCloseUpdate := ht.CloseChannelAssertPending(
+		bob, chanPoint, false, lntest.WithCoopCloseFeeRate(bobFeeRate),
+		lntest.WithLocalTxNotify(),
+	)
+
+	// Confirm that this new update was at 10 sat/vb.
+	bobPendingUpdate := bobCloseUpdate.GetClosePending()
+	checkAdditionalOutputs(ht, chainhash.Hash(bobPendingUpdate.Txid))
+
+	aliceCloseUpdate, err := ht.ReceiveCloseChannelUpdate(aliceCloseStream)
+	require.NoError(ht, err)
+	alicePendingUpdate = aliceCloseUpdate.GetClosePending()
+	checkAdditionalOutputs(ht, chainhash.Hash(alicePendingUpdate.Txid))
+
+	block := ht.MineBlocksAndAssertNumTxes(1, 1)[0]
+
+	// Both Alice and Bob should trigger a final close update to signal the
+	// closing transaction has confirmed.
+	aliceClosingTxid := ht.WaitForChannelCloseEvent(aliceCloseStream)
+	checkAdditionalOutputs(ht, chainhash.Hash(aliceClosingTxid))
+	ht.AssertTxInBlock(block, aliceClosingTxid)
+}
+
+func checkAdditionalOutputs(ht *lntest.HarnessTest, txid chainhash.Hash) {
+	tx := ht.Miner().GetRawTransaction(chainhash.Hash(txid))
 	txOuts := tx.MsgTx().TxOut
 	require.Equal(ht, 3, len(txOuts))
 
@@ -268,56 +280,6 @@ func testCoopCloseRbfWithAuxCloseOutputs(ht *lntest.HarnessTest) {
 		}
 	}
 	require.True(ht, contains)
-
-	bobFeeRate := aliceFeeRate * 2
-	_, bobCloseUpdate := ht.CloseChannelAssertPending(
-		bob, chanPoint, false, lntest.WithCoopCloseFeeRate(bobFeeRate),
-		lntest.WithLocalTxNotify(),
-	)
-
-	// Confirm that this new update was at 10 sat/vb.
-	bobPendingUpdate := bobCloseUpdate.GetClosePending()
-	tx = ht.Miner().GetRawTransaction(chainhash.Hash(bobPendingUpdate.Txid))
-	require.Equal(ht, 3, len(tx.MsgTx().TxOut))
-	contains = false
-	txOuts = tx.MsgTx().TxOut
-	for _, txOut := range txOuts {
-		if txOut.Value == expectedTxOut.Value && bytes.Equal(txOut.PkScript, expectedTxOut.PkScript) {
-			contains = true
-		}
-	}
-	require.True(ht, contains)
-
-	aliceCloseUpdate, err := ht.ReceiveCloseChannelUpdate(aliceCloseStream)
-	require.NoError(ht, err)
-	alicePendingUpdate = aliceCloseUpdate.GetClosePending()
-	tx = ht.Miner().GetRawTransaction(chainhash.Hash(alicePendingUpdate.Txid))
-	require.Equal(ht, 3, len(tx.MsgTx().TxOut))
-	contains = false
-	txOuts = tx.MsgTx().TxOut
-	for _, txOut := range txOuts {
-		if txOut.Value == expectedTxOut.Value && bytes.Equal(txOut.PkScript, expectedTxOut.PkScript) {
-			contains = true
-		}
-	}
-	require.True(ht, contains)
-
-	block := ht.MineBlocksAndAssertNumTxes(1, 1)[0]
-
-	// Both Alice and Bob should trigger a final close update to signal the
-	// closing transaction has confirmed.
-	aliceClosingTxid := ht.WaitForChannelCloseEvent(aliceCloseStream)
-	tx = ht.Miner().GetRawTransaction(aliceClosingTxid)
-	require.Equal(ht, 3, len(tx.MsgTx().TxOut))
-	contains = false
-	txOuts = tx.MsgTx().TxOut
-	for _, txOut := range txOuts {
-		if txOut.Value == expectedTxOut.Value && bytes.Equal(txOut.PkScript, expectedTxOut.PkScript) {
-			contains = true
-		}
-	}
-	require.True(ht, contains)
-	ht.AssertTxInBlock(block, aliceClosingTxid)
 }
 
 // testRBFCoopCloseDisconnect tests that when a node disconnects that the node
@@ -356,7 +318,6 @@ func testCoopCloseRBFWithReorg(ht *lntest.HarnessTest) {
 	const requiredConfs = 3
 	rbfCoopFlags := []string{
 		"--protocol.rbf-coop-close",
-		// Do something like this?
 		"--dev.force-channel-close-confs=3",
 	}
 

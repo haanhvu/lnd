@@ -38,11 +38,11 @@ type DevConfig struct {
 	MockAuxChanCloser           bool          `long:"mock-aux-chan-closer" description:"Set the mock AuxChanCloser for tests."`
 }
 
-func (d *DevConfig) GetMockAuxChanCloser() bool {
+func (d *DevConfig) NeedMockAuxChanCloser() bool {
 	return d.MockAuxChanCloser
 }
 
-func (d *DevConfig) GetMockAuxChanCloserForTest() fn.Option[chancloser.AuxChanCloser] {
+func (d *DevConfig) GetMockAuxChanCloserValueForTest() fn.Option[chancloser.AuxChanCloser] {
 	return fn.Some[chancloser.AuxChanCloser](&mockAuxChanCloser{})
 }
 

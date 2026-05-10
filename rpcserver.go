@@ -683,8 +683,6 @@ func newRPCServer(cfg *Config, interceptorChain *rpcperms.InterceptorChain,
 		)
 	}
 
-	//implCfg.AuxChanCloser = fn.Some[chancloser.AuxChanCloser](&mockAuxChanCloser{})
-
 	return &rpcServer{
 		cfg:              cfg,
 		subGrpcHandlers:  subServerHandlers,
@@ -693,10 +691,6 @@ func newRPCServer(cfg *Config, interceptorChain *rpcperms.InterceptorChain,
 		quit:             make(chan struct{}, 1),
 		interceptor:      interceptor,
 	}
-}
-
-func (r *rpcServer) SetImplementationCfg(implCfg *ImplementationCfg) {
-	r.implCfg = implCfg
 }
 
 // addDeps populates all dependencies needed by the RPC server, and any
@@ -2759,13 +2753,6 @@ func (r *rpcServer) BatchOpenChannel(ctx context.Context,
 // a force close after a timeout period in the case of an inactive peer.
 func (r *rpcServer) CloseChannel(in *lnrpc.CloseChannelRequest,
 	updateStream lnrpc.Lightning_CloseChannelServer) error {
-
-	/*err := fn.MapOptionZ(r.implCfg.AuxChanCloser, func(aux chancloser.AuxChanCloser) error {
-		return ErrServerNotActive
-	})
-	if err != nil {
-		return err
-	}*/
 
 	if !r.server.Started() {
 		return ErrServerNotActive

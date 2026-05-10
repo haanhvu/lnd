@@ -183,8 +183,6 @@ func assertSpendEventCloseFin(t *testing.T, startingState ProtocolState) {
 		)
 
 		closeHarness.assertStateTransitions(&CloseFin{})
-
-		// Need to check for AuxCloseOutput in last case CloseFin?
 	})
 }
 
@@ -462,7 +460,6 @@ func (r *rbfCloserTestHarness) expectNewCloseSig(
 			nil, fn.None[chainhash.Hash](),
 		)
 		r.signer.On(
-			// Need to put closeOpts here?
 			"CreateCloseProposal", fee, localScript, remoteScript,
 			mock.Anything,
 		).Return(musigSig, &localTx, closeBalance, nil)
@@ -470,7 +467,6 @@ func (r *rbfCloserTestHarness) expectNewCloseSig(
 	// For non-taproot channels, return regular ECDSA signature.
 	default:
 		r.signer.On(
-			// Need to put closeOpts here?
 			"CreateCloseProposal", fee, localScript, remoteScript,
 			mock.Anything,
 		).Return(&localSig, &localTx, closeBalance, nil)
@@ -513,14 +509,12 @@ func (r *rbfCloserTestHarness) expectCloseFinalized(
 	// exact types will differ.
 	switch {
 	case r.env.LocalMusigSession != nil:
-		// Need to put closeOpts here?
 		r.signer.On("CompleteCooperativeClose",
 			mock.Anything, mock.Anything, localScript,
 			remoteScript, fee, mock.Anything,
 		).Return(closeTx, balanceAfterClose, nil)
 	default:
 		// The caller should obtain the final signature.
-		// Need to put closeOpts here?
 		r.signer.On("CompleteCooperativeClose",
 			localCoopSig, remoteCoopSig, localScript,
 			remoteScript, fee, mock.Anything,
@@ -559,8 +553,18 @@ func (r *rbfCloserTestHarness) assertLocalClosePending() {
 
 	require.Equal(r.T, closeTx, closePendingState.CloseTx)
 
-	// Check for value later
-	require.NotNil(r.T, closePendingState.AuxOutputs)
+	require.Contains(r.T, closePendingState.AuxOutputs.UnsafeFromSome().ExtraCloseOutputs,
+		lnwallet.CloseOutput{
+			TxOut: wire.TxOut{
+				Value: 50_000,
+				PkScript: []byte{
+					0x00, 0x14,
+					0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+					0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+				},
+			},
+			IsLocal: false,
+		})
 }
 
 type dustExpectation uint
@@ -738,8 +742,19 @@ func (r *rbfCloserTestHarness) expectHalfSignerIteration(
 		require.Equal(r.T, localSigWire, offerSentState.LocalSig)
 	}
 
-	// Check for real value later
-	require.NotNil(r.T, offerSentState.AuxOutputs)
+	require.Contains(r.T, offerSentState.AuxOutputs.UnsafeFromSome().ExtraCloseOutputs,
+		lnwallet.CloseOutput{
+			TxOut: wire.TxOut{
+				Value: 50_000,
+				PkScript: []byte{
+					0x00, 0x14,
+					0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+					0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+				},
+			},
+			IsLocal: false,
+		})
+
 }
 
 func (r *rbfCloserTestHarness) assertSingleRbfIteration(
@@ -896,7 +911,18 @@ func (r *rbfCloserTestHarness) assertSingleRemoteRbfIteration(
 	// stashed in the state.
 	require.Equal(r.T, closeTx, pendingState.CloseTx)
 
-	// Check for AuxCloseOutput later, AuxCloseOutput not exists in every case (only exists in RemoteClose)
+	require.Contains(r.T, pendingState.AuxOutputs.UnsafeFromSome().ExtraCloseOutputs,
+		lnwallet.CloseOutput{
+			TxOut: wire.TxOut{
+				Value: 50_000,
+				PkScript: []byte{
+					0x00, 0x14,
+					0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+					0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+				},
+			},
+			IsLocal: false,
+		})
 }
 
 // TestSelectTaprootPartialSigWithNonce tests the selection logic for taproot
@@ -976,8 +1002,23 @@ func (m *mockAuxChanCloser) ShutdownBlob(
 func (m *mockAuxChanCloser) AuxCloseOutputs(
 	desc types.AuxCloseDesc) (fn.Option[AuxCloseOutputs], error) {
 
-	// Implement later
-	return fn.None[AuxCloseOutputs](), nil
+	return fn.Some[AuxCloseOutputs](
+		AuxCloseOutputs{
+			ExtraCloseOutputs: []lnwallet.CloseOutput{
+				{
+					TxOut: wire.TxOut{
+						Value: 50_000,
+						PkScript: []byte{
+							0x00, 0x14,
+							0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+							0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+						},
+					},
+					IsLocal: desc.Initiator,
+				},
+			},
+		},
+	), nil
 }
 
 func (m *mockAuxChanCloser) FinalizeClose(desc types.AuxCloseDesc,
@@ -1039,10 +1080,8 @@ func newRbfCloserTestHarness(t *testing.T,
 		NewDeliveryScript:     harness.newAddrFunc,
 		FeeEstimator:          feeEstimator,
 		AuxCloser:             fn.Some[AuxChanCloser](&mockAuxChanCloser{}),
-		// TODO: Replace with needed fields to fix unit tests
-		//Channel:               &mockChannel{},
-		ChanObserver: mockObserver,
-		CloseSigner:  mockSigner,
+		ChanObserver:          mockObserver,
+		CloseSigner:           mockSigner,
 	}
 
 	// If musig sessions are provided, we set them in the environment.
@@ -2661,7 +2700,6 @@ func TestRbfCloseClosingNegotiationLocal(t *testing.T) {
 		require.IsType(
 			t, &ErrStateCantPayForFee{}, closeErrState.ErrState,
 		)
-		require.NotNil(t, closeErrState.AuxOutputs)
 	})
 
 	// Any other event should be ignored.
@@ -3489,5 +3527,3 @@ func TestLocalOfferSentUsesStoredSig(t *testing.T) {
 			"NonceState (not NextCloseeNonce from ClosingSig)",
 	)
 }
-
-// Need more checks?

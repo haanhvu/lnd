@@ -22,11 +22,11 @@ func IsDevBuild() bool {
 // should always remain empty.
 type DevConfig struct{}
 
-func (d *DevConfig) GetMockAuxChanCloser() bool {
+func (d *DevConfig) NeedMockAuxChanCloser() bool {
 	return false
 }
 
-func (d *DevConfig) GetMockAuxChanCloserForTest() fn.Option[chancloser.AuxChanCloser] {
+func (d *DevConfig) GetMockAuxChanCloserValueForTest() fn.Option[chancloser.AuxChanCloser] {
 	return fn.None[chancloser.AuxChanCloser]()
 }
 

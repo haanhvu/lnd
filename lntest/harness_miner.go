@@ -136,7 +136,7 @@ func (h *HarnessTest) DisconnectMiner() {
 
 // cleanMempool mines blocks till the mempool is empty and asserts all active
 // nodes have synced to the chain.
-func (h *HarnessTest) CleanMempool() {
+func (h *HarnessTest) cleanMempool() {
 	_, startHeight := h.GetBestBlock()
 
 	// Mining the blocks slow to give `lnd` more time to sync.
