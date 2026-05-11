@@ -125,9 +125,6 @@ func runRbfCoopCloseTest(st *lntest.HarnessTest,
 		lntest.WithLocalTxNotify(),
 	)
 
-	chanClose := aliceCloseUpdate.Update.(*lnrpc.CloseStatusUpdate_ChanClose)
-	require.GreaterOrEqual(st, len(chanClose.ChanClose.AdditionalOutputs), 1)
-
 	alicePendingUpdate = aliceCloseUpdate.GetClosePending()
 	require.NotNil(st, aliceCloseUpdate)
 	require.Equal(
