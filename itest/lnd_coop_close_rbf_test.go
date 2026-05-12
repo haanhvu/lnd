@@ -208,6 +208,8 @@ func testCoopCloseRbf(ht *lntest.HarnessTest) {
 	}
 }
 
+// testCoopCloseRbfWithAuxCloseOutputs tests that AuxCloseOutputs are included in the TxOuts
+// when AuxChanCloser exists and are preserved across fee updates.
 func testCoopCloseRbfWithAuxCloseOutputs(ht *lntest.HarnessTest) {
 	ht.SetFeeEstimate(250)
 	ht.SetFeeEstimateWithConf(250, 6)
@@ -229,7 +231,6 @@ func testCoopCloseRbfWithAuxCloseOutputs(ht *lntest.HarnessTest) {
 		lntest.WithLocalTxNotify(),
 	)
 
-	// Confirm that this new update was at 5 sat/vb.
 	alicePendingUpdate := aliceCloseUpdate.GetClosePending()
 	checkAdditionalOutputs(ht, chainhash.Hash(alicePendingUpdate.Txid))
 
@@ -239,7 +240,6 @@ func testCoopCloseRbfWithAuxCloseOutputs(ht *lntest.HarnessTest) {
 		lntest.WithLocalTxNotify(),
 	)
 
-	// Confirm that this new update was at 10 sat/vb.
 	bobPendingUpdate := bobCloseUpdate.GetClosePending()
 	checkAdditionalOutputs(ht, chainhash.Hash(bobPendingUpdate.Txid))
 
@@ -250,8 +250,6 @@ func testCoopCloseRbfWithAuxCloseOutputs(ht *lntest.HarnessTest) {
 
 	block := ht.MineBlocksAndAssertNumTxes(1, 1)[0]
 
-	// Both Alice and Bob should trigger a final close update to signal the
-	// closing transaction has confirmed.
 	aliceClosingTxid := ht.WaitForChannelCloseEvent(aliceCloseStream)
 	checkAdditionalOutputs(ht, chainhash.Hash(aliceClosingTxid))
 	ht.AssertTxInBlock(block, aliceClosingTxid)

@@ -129,6 +129,8 @@ type ShutdownReceived struct {
 	// shutdown.
 	ShutdownScript lnwire.DeliveryAddress
 
+	// CustomRecords are the custom TLV records
+	// that were included in the remote party's shutdown message.
 	CustomRecords lnwire.CustomRecords
 
 	// BlockHeight is the height at which the shutdown message was
@@ -347,8 +349,6 @@ type Environment struct {
 	// satoshis we'll pay given a local and/or remote output.
 	FeeEstimator CoopFeeEstimator
 
-	// AuxCloser is an optional interface that can be used to modify the
-	// way the co-op close process proceeds.
 	AuxCloser fn.Option[AuxChanCloser]
 
 	LocalInternalKey fn.Option[btcec.PublicKey]

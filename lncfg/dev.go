@@ -22,10 +22,14 @@ func IsDevBuild() bool {
 // should always remain empty.
 type DevConfig struct{}
 
+// NeedMockAuxChanCloser returns the config value for MockAuxChanCloser,
+// which is always false for production build.
 func (d *DevConfig) NeedMockAuxChanCloser() bool {
 	return false
 }
 
+// GetMockAuxChanCloserValueForTest returns the mock AuxChanCloser value
+// which is always None for production build
 func (d *DevConfig) GetMockAuxChanCloserValueForTest() fn.Option[chancloser.AuxChanCloser] {
 	return fn.None[chancloser.AuxChanCloser]()
 }

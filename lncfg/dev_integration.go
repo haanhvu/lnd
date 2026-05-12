@@ -38,14 +38,19 @@ type DevConfig struct {
 	MockAuxChanCloser           bool          `long:"mock-aux-chan-closer" description:"Set the mock AuxChanCloser for tests."`
 }
 
+// NeedMockAuxChanCloser returns the config value for MockAuxChanCloser,
+// indicating whether the integration test needs a mock AuxChanCloser.
 func (d *DevConfig) NeedMockAuxChanCloser() bool {
 	return d.MockAuxChanCloser
 }
 
+// GetMockAuxChanCloserValueForTest returns the mock AuxChanCloser value
+// that can be used in integration tests.
 func (d *DevConfig) GetMockAuxChanCloserValueForTest() fn.Option[chancloser.AuxChanCloser] {
 	return fn.Some[chancloser.AuxChanCloser](&mockAuxChanCloser{})
 }
 
+// Mock implementation for AuxChanCloser
 type mockAuxChanCloser struct{}
 
 func (m *mockAuxChanCloser) ShutdownBlob(
