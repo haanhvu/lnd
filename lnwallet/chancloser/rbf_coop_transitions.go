@@ -356,6 +356,7 @@ func (c *ChannelActive) ProcessEvent(event ProtocolEvent, env *Environment,
 		// This prepares the session for when we act as closer.
 		initLocalMusigCloseeNonce(env, msg.RemoteShutdownNonce)
 
+		//nolint:ll
 		return &CloseStateTransition{
 			NextState: &ShutdownPending{
 				ShutdownScripts: ShutdownScripts{
@@ -363,7 +364,6 @@ func (c *ChannelActive) ProcessEvent(event ProtocolEvent, env *Environment,
 					RemoteDeliveryScript: remoteAddr,
 				},
 				ShutdownCustomRecords: ShutdownCustomRecords{
-					//nolint:ll
 					LocalCustomRecords:  shutdownCustomRecords,
 					RemoteCustomRecords: msg.CustomRecords,
 				},

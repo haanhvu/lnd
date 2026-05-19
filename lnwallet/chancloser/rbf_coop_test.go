@@ -1385,6 +1385,7 @@ func testRemoteInitiatedCloseOkNonTap(t *testing.T, ctx context.Context) {
 			t, remoteAddr,
 			currentState.ShutdownScripts.RemoteDeliveryScript,
 		)
+
 		require.Equal(
 			t, localCustomRecords, currentState.LocalCustomRecords,
 		)
