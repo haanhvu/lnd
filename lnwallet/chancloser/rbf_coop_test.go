@@ -51,6 +51,18 @@ var (
 		1: []byte("remote"),
 	}
 
+	expectedAuxOutputs = lnwallet.CloseOutput{
+		TxOut: wire.TxOut{
+			Value: 50_000,
+			PkScript: []byte{
+				0x00, 0x14, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+				0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+				0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+			},
+		},
+		IsLocal: false,
+	}
+
 	localSigBytes = fromHex("3045022100cd496f2ab4fe124f977ffe3caa09f757" +
 		"6d8a34156b4e55d326b4dffc0399a094022013500a0510b5094bff220c7" +
 		"4656879b8ca0369d3da78004004c970790862fc03")
@@ -553,18 +565,9 @@ func (r *rbfCloserTestHarness) assertLocalClosePending() {
 
 	require.Equal(r.T, closeTx, closePendingState.CloseTx)
 
-	require.Contains(r.T, closePendingState.AuxOutputs.UnsafeFromSome().ExtraCloseOutputs,
-		lnwallet.CloseOutput{
-			TxOut: wire.TxOut{
-				Value: 50_000,
-				PkScript: []byte{
-					0x00, 0x14,
-					0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
-					0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
-				},
-			},
-			IsLocal: false,
-		})
+	require.Contains(r.T,
+		closePendingState.AuxOutputs.UnsafeFromSome().ExtraCloseOutputs,
+		expectedAuxOutputs)
 }
 
 type dustExpectation uint
@@ -742,18 +745,9 @@ func (r *rbfCloserTestHarness) expectHalfSignerIteration(
 		require.Equal(r.T, localSigWire, offerSentState.LocalSig)
 	}
 
-	require.Contains(r.T, offerSentState.AuxOutputs.UnsafeFromSome().ExtraCloseOutputs,
-		lnwallet.CloseOutput{
-			TxOut: wire.TxOut{
-				Value: 50_000,
-				PkScript: []byte{
-					0x00, 0x14,
-					0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
-					0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
-				},
-			},
-			IsLocal: false,
-		})
+	require.Contains(r.T,
+		offerSentState.AuxOutputs.UnsafeFromSome().ExtraCloseOutputs,
+		expectedAuxOutputs)
 }
 
 func (r *rbfCloserTestHarness) assertSingleRbfIteration(
@@ -910,18 +904,9 @@ func (r *rbfCloserTestHarness) assertSingleRemoteRbfIteration(
 	// stashed in the state.
 	require.Equal(r.T, closeTx, pendingState.CloseTx)
 
-	require.Contains(r.T, pendingState.AuxOutputs.UnsafeFromSome().ExtraCloseOutputs,
-		lnwallet.CloseOutput{
-			TxOut: wire.TxOut{
-				Value: 50_000,
-				PkScript: []byte{
-					0x00, 0x14,
-					0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
-					0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
-				},
-			},
-			IsLocal: false,
-		})
+	require.Contains(r.T,
+		pendingState.AuxOutputs.UnsafeFromSome().ExtraCloseOutputs,
+		expectedAuxOutputs)
 }
 
 // TestSelectTaprootPartialSigWithNonce tests the selection logic for taproot
@@ -1008,9 +993,12 @@ func (m *mockAuxChanCloser) AuxCloseOutputs(
 					TxOut: wire.TxOut{
 						Value: 50_000,
 						PkScript: []byte{
-							0x00, 0x14,
-							0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
-							0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+							0x00, 0x14, 0x11, 0x11,
+							0x11, 0x11, 0x11, 0x11,
+							0x11, 0x11, 0x11, 0x11,
+							0x11, 0x11, 0x11, 0x11,
+							0x11, 0x11, 0x11, 0x11,
+							0x11, 0x11,
 						},
 					},
 					IsLocal: desc.Initiator,
@@ -1078,9 +1066,10 @@ func newRbfCloserTestHarness(t *testing.T,
 		LocalUpfrontShutdown:  cfg.localUpfrontAddr,
 		NewDeliveryScript:     harness.newAddrFunc,
 		FeeEstimator:          feeEstimator,
-		AuxCloser:             fn.Some[AuxChanCloser](&mockAuxChanCloser{}),
-		ChanObserver:          mockObserver,
-		CloseSigner:           mockSigner,
+		AuxCloser: fn.Some[AuxChanCloser](
+			&mockAuxChanCloser{}),
+		ChanObserver: mockObserver,
+		CloseSigner:  mockSigner,
 	}
 
 	// If musig sessions are provided, we set them in the environment.
@@ -1209,7 +1198,9 @@ func testInitiatorShutdownRecvOkNonTap(t *testing.T, ctx context.Context,
 			t, localCustomRecords, currentState.LocalCustomRecords,
 		)
 		require.Equal(
-			t, remoteCustomRecords, currentState.RemoteCustomRecords,
+			t,
+			remoteCustomRecords,
+			currentState.RemoteCustomRecords,
 		)
 
 		require.Equal(
@@ -1301,7 +1292,9 @@ func testInitiatorShutdownRecvOkTaproot(t *testing.T, ctx context.Context,
 			t, localCustomRecords, currentState.LocalCustomRecords,
 		)
 		require.Equal(
-			t, remoteCustomRecords, currentState.RemoteCustomRecords,
+			t,
+			remoteCustomRecords,
+			currentState.RemoteCustomRecords,
 		)
 
 		require.Equal(
@@ -1396,7 +1389,9 @@ func testRemoteInitiatedCloseOkNonTap(t *testing.T, ctx context.Context) {
 			t, localCustomRecords, currentState.LocalCustomRecords,
 		)
 		require.Equal(
-			t, remoteCustomRecords, currentState.RemoteCustomRecords,
+			t,
+			remoteCustomRecords,
+			currentState.RemoteCustomRecords,
 		)
 	})
 }
@@ -1465,7 +1460,9 @@ func testRemoteInitiatedCloseOkTaproot(t *testing.T, ctx context.Context) {
 			t, localCustomRecords, currentState.LocalCustomRecords,
 		)
 		require.Equal(
-			t, remoteCustomRecords, currentState.RemoteCustomRecords,
+			t,
+			remoteCustomRecords,
+			currentState.RemoteCustomRecords,
 		)
 
 		// Verify nonce state was set with remote's closee nonce.

@@ -46,11 +46,13 @@ func (d *DevConfig) NeedMockAuxChanCloser() bool {
 
 // GetMockAuxChanCloserValueForTest returns the mock AuxChanCloser value
 // that can be used in integration tests.
+//
+//nolint:ll
 func (d *DevConfig) GetMockAuxChanCloserValueForTest() fn.Option[chancloser.AuxChanCloser] {
 	return fn.Some[chancloser.AuxChanCloser](&mockAuxChanCloser{})
 }
 
-// Mock implementation for AuxChanCloser
+// Mock implementation for AuxChanCloser.
 type mockAuxChanCloser struct{}
 
 func (m *mockAuxChanCloser) ShutdownBlob(
@@ -61,7 +63,9 @@ func (m *mockAuxChanCloser) ShutdownBlob(
 }
 
 func (m *mockAuxChanCloser) AuxCloseOutputs(
-	desc types.AuxCloseDesc) (fn.Option[chancloser.AuxCloseOutputs], error) {
+	desc types.AuxCloseDesc,
+) (fn.Option[chancloser.AuxCloseOutputs], error) {
+
 	return fn.Some[chancloser.AuxCloseOutputs](
 		chancloser.AuxCloseOutputs{
 			ExtraCloseOutputs: []lnwallet.CloseOutput{
@@ -69,9 +73,12 @@ func (m *mockAuxChanCloser) AuxCloseOutputs(
 					TxOut: wire.TxOut{
 						Value: 50_000,
 						PkScript: []byte{
-							0x00, 0x14,
-							0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
-							0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+							0x00, 0x14, 0x11, 0x11,
+							0x11, 0x11, 0x11, 0x11,
+							0x11, 0x11, 0x11, 0x11,
+							0x11, 0x11, 0x11, 0x11,
+							0x11, 0x11, 0x11, 0x11,
+							0x11, 0x11,
 						},
 					},
 					IsLocal: desc.Initiator,

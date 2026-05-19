@@ -208,13 +208,16 @@ func testCoopCloseRbf(ht *lntest.HarnessTest) {
 	}
 }
 
-// testCoopCloseRbfWithAuxCloseOutputs tests that AuxCloseOutputs are included in the TxOuts
-// when AuxChanCloser exists and are preserved across fee updates.
+// testCoopCloseRbfWithAuxCloseOutputs tests that
+// AuxCloseOutputs are included in the TxOuts when AuxChanCloser exists
+// and are preserved across fee updates.
 func testCoopCloseRbfWithAuxCloseOutputs(ht *lntest.HarnessTest) {
 	ht.SetFeeEstimate(250)
 	ht.SetFeeEstimateWithConf(250, 6)
 
-	rbfCoopFlags := []string{"--protocol.rbf-coop-close", "--dev.mock-aux-chan-closer"}
+	rbfCoopFlags := []string{
+		"--protocol.rbf-coop-close",
+		"--dev.mock-aux-chan-closer"}
 	params := lntest.OpenChannelParams{
 		Amt:     btcutil.Amount(10_000_000),
 		PushAmt: btcutil.Amount(5_000_000),
@@ -251,26 +254,31 @@ func testCoopCloseRbfWithAuxCloseOutputs(ht *lntest.HarnessTest) {
 	block := ht.MineBlocksAndAssertNumTxes(1, 1)[0]
 
 	aliceClosingTxid := ht.WaitForChannelCloseEvent(aliceCloseStream)
-	checkAdditionalOutputs(ht, chainhash.Hash(aliceClosingTxid))
+	checkAdditionalOutputs(ht, aliceClosingTxid)
 	ht.AssertTxInBlock(block, aliceClosingTxid)
 }
 
 func checkAdditionalOutputs(ht *lntest.HarnessTest, txid chainhash.Hash) {
-	tx := ht.Miner().GetRawTransaction(chainhash.Hash(txid))
+	tx := ht.Miner().GetRawTransaction(txid)
 	txOuts := tx.MsgTx().TxOut
 	require.Equal(ht, 3, len(txOuts))
 
 	expectedTxOut := wire.TxOut{
 		Value: 50_000,
 		PkScript: []byte{
-			0x00, 0x14,
-			0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
-			0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+			0x00, 0x14, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+			0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+			0x11, 0x11, 0x11, 0x11,
 		},
 	}
 	contains := false
 	for _, txOut := range txOuts {
-		if txOut.Value == expectedTxOut.Value && bytes.Equal(txOut.PkScript, expectedTxOut.PkScript) {
+		if txOut.Value == expectedTxOut.Value &&
+			bytes.Equal(
+				txOut.PkScript,
+				expectedTxOut.PkScript,
+			) {
+
 			contains = true
 		}
 	}

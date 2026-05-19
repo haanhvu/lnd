@@ -4000,6 +4000,7 @@ func (p *Brontide) observeRbfCloseUpdates(chanCloser *chancloser.RbfChanCloser,
 				// update to the client.
 				closingTxid := closeState.ConfirmedTx.TxHash()
 				if closeReq != nil {
+					//nolint:ll
 					closeReq.Updates <- &ChannelCloseUpdate{
 						ClosingTxid:       closingTxid[:],
 						Success:           true,

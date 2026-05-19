@@ -267,6 +267,7 @@ func (c *ChannelActive) ProcessEvent(event ProtocolEvent, env *Environment,
 		// From here, we'll transition to the shutdown pending state. In
 		// this state we await their shutdown message (self loop), then
 		// also the flushing event.
+		//nolint:ll
 		return &CloseStateTransition{
 			NextState: &ShutdownPending{
 				IdealFeeRate: fn.Some(msg.IdealFeeRate),
@@ -362,6 +363,7 @@ func (c *ChannelActive) ProcessEvent(event ProtocolEvent, env *Environment,
 					RemoteDeliveryScript: remoteAddr,
 				},
 				ShutdownCustomRecords: ShutdownCustomRecords{
+					//nolint:ll
 					LocalCustomRecords:  shutdownCustomRecords,
 					RemoteCustomRecords: msg.CustomRecords,
 				},
@@ -490,6 +492,7 @@ func (s *ShutdownPending) ProcessEvent(event ProtocolEvent, env *Environment,
 
 		// We transition to the ChannelFlushing state, where we await
 		// the ChannelFlushed event.
+		//nolint:ll
 		return &CloseStateTransition{
 			NextState: &ChannelFlushing{
 				IdealFeeRate: s.IdealFeeRate,
@@ -1209,11 +1212,18 @@ func (l *LocalCloseStart) ProcessEvent(event ProtocolEvent, env *Environment,
 			closeOpts = append(closeOpts, musigOpts...)
 		}
 
-		localCloseOutput := env.CloseOutput(l.LocalDeliveryScript, l.LocalCustomRecords)
-		remoteCloseOutput := env.CloseOutput(l.RemoteDeliveryScript, l.RemoteCustomRecords)
+		localCloseOutput := env.CloseOutput(
+			l.LocalDeliveryScript,
+			l.LocalCustomRecords)
+		remoteCloseOutput := env.CloseOutput(
+			l.RemoteDeliveryScript,
+			l.RemoteCustomRecords)
 
 		var err error
-		l.AuxOutputs, err = env.AuxCloseOutputs(absoluteFee, localCloseOutput, remoteCloseOutput)
+		l.AuxOutputs, err = env.AuxCloseOutputs(
+			absoluteFee,
+			localCloseOutput,
+			remoteCloseOutput)
 		if err != nil {
 			return nil, err
 		}
@@ -1620,10 +1630,17 @@ func (l *LocalOfferSent) ProcessEvent(event ProtocolEvent, env *Environment,
 		}
 		closeOpts = append(closeOpts, musigOpts...)
 
-		localCloseOutput := env.CloseOutput(l.LocalDeliveryScript, l.LocalCustomRecords)
-		remoteCloseOutput := env.CloseOutput(l.RemoteDeliveryScript, l.RemoteCustomRecords)
+		localCloseOutput := env.CloseOutput(
+			l.LocalDeliveryScript,
+			l.LocalCustomRecords)
+		remoteCloseOutput := env.CloseOutput(
+			l.RemoteDeliveryScript,
+			l.RemoteCustomRecords)
 
-		l.AuxOutputs, err = env.AuxCloseOutputs(l.ProposedFee, localCloseOutput, remoteCloseOutput)
+		l.AuxOutputs, err = env.AuxCloseOutputs(
+			l.ProposedFee,
+			localCloseOutput,
+			remoteCloseOutput)
 		if err != nil {
 			return nil, err
 		}
@@ -2107,10 +2124,17 @@ func (l *RemoteCloseStart) ProcessEvent(event ProtocolEvent, env *Environment,
 			l.LocalDeliveryScript[:], l.RemoteDeliveryScript[:],
 			msg.SigMsg.FeeSatoshis, msg.SigMsg.LockTime)
 
-		localCloseOutput := env.CloseOutput(l.LocalDeliveryScript, l.LocalCustomRecords)
-		remoteCloseOutput := env.CloseOutput(l.RemoteDeliveryScript, l.RemoteCustomRecords)
+		localCloseOutput := env.CloseOutput(
+			l.LocalDeliveryScript,
+			l.LocalCustomRecords)
+		remoteCloseOutput := env.CloseOutput(
+			l.RemoteDeliveryScript,
+			l.RemoteCustomRecords)
 
-		l.AuxOutputs, err = env.AuxCloseOutputs(msg.SigMsg.FeeSatoshis, localCloseOutput, remoteCloseOutput)
+		l.AuxOutputs, err = env.AuxCloseOutputs(
+			msg.SigMsg.FeeSatoshis,
+			localCloseOutput,
+			remoteCloseOutput)
 		if err != nil {
 			return nil, err
 		}
@@ -2237,8 +2261,12 @@ func (c *ClosePending) ProcessEvent(event ProtocolEvent, env *Environment,
 	// If we can a spend while waiting for the close, then we'll go to our
 	// terminal state.
 	case *SpendEvent:
-		localCloseOutput := env.CloseOutput(c.LocalDeliveryScript, c.LocalCustomRecords)
-		remoteCloseOutput := env.CloseOutput(c.RemoteDeliveryScript, c.RemoteCustomRecords)
+		localCloseOutput := env.CloseOutput(
+			c.LocalDeliveryScript,
+			c.LocalCustomRecords)
+		remoteCloseOutput := env.CloseOutput(
+			c.RemoteDeliveryScript,
+			c.RemoteCustomRecords)
 		return &CloseStateTransition{
 			NextState: &CloseFin{
 				ConfirmedTx:       msg.Tx,

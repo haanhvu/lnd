@@ -350,7 +350,8 @@ type Environment struct {
 	FeeEstimator CoopFeeEstimator
 
 	// AuxCloser is an optional auxiliary channel closer used to derive
-	// additional shutdown records and close outputs for custom channel types.
+	// additional shutdown records and close outputs
+	// for custom channel types.
 	AuxCloser fn.Option[AuxChanCloser]
 
 	// LocalInternalKey is the optional local internal taproot key used when
@@ -361,24 +362,26 @@ type Environment struct {
 	// output and passed to the auxiliary closer during close handling.
 	FundingBlob fn.Option[tlv.Blob]
 
-	// CommitBlob is optional auxiliary metadata derived from the latest
-	// commitment state and passed to the auxiliary closer during close handling.
+	// CommitBlob is optional auxiliary metadata derived from the
+	// latest commitment state and passed to the auxiliary closer
+	// during close handling.
 	CommitBlob fn.Option[tlv.Blob]
 
-	// DustLimit is the dust threshold used to determine whether this party's
-	// close output should be omitted from the cooperative close transaction.
+	// DustLimit is the dust threshold used to determine whether
+	// this party's close output should be omitted from the
+	// cooperative close transaction.
 	DustLimit btcutil.Amount
 
 	// Amt is this party's settled close amount that would be paid to its
 	// delivery script before accounting for output trimming rules.
 	Amt btcutil.Amount
 
-	// CommitFee is the commitment transaction fee associated with the latest
-	// channel state, used when deriving auxiliary close outputs.
+	// CommitFee is the commitment transaction fee associated with the
+	// latest channel state, used when deriving auxiliary close outputs.
 	CommitFee btcutil.Amount
 
-	// Initiator indicates whether the local node initiated the channel and is
-	// used when deriving auxiliary shutdown and close parameters.
+	// Initiator indicates whether the local node initiated the channel
+	// and is used when deriving auxiliary shutdown and close parameters.
 	Initiator bool
 
 	// ChanObserver is an interface used to observe state changes to the
@@ -418,6 +421,8 @@ func (e *Environment) IsTaproot() bool {
 
 // AuxCloseOutputs returns any auxiliary close outputs for the cooperative
 // close transaction.
+//
+//nolint:ll
 func (e *Environment) AuxCloseOutputs(closeFee btcutil.Amount,
 	localCloseOutput fn.Option[types.CloseOutput],
 	remoteCloseOutput fn.Option[types.CloseOutput]) (fn.Option[AuxCloseOutputs], error) {
@@ -456,8 +461,11 @@ func (e *Environment) AuxCloseOutputs(closeFee btcutil.Amount,
 
 // CloseOutput returns the close output for the given delivery script and
 // shutdown custom records.
+//
+//nolint:ll
 func (e *Environment) CloseOutput(deliveryScript lnwire.DeliveryAddress,
 	shutdownCustomRecords lnwire.CustomRecords) fn.Option[types.CloseOutput] {
+
 	return fn.Some(types.CloseOutput{
 		Amt:             e.Amt,
 		DustLimit:       e.DustLimit,
@@ -468,7 +476,9 @@ func (e *Environment) CloseOutput(deliveryScript lnwire.DeliveryAddress,
 
 // ShutdownCustomRecords returns shutdown custom records from the auxiliary
 // channel closer.
-func (e *Environment) ShutdownCustomRecords(isInitiator bool) (lnwire.CustomRecords, error) {
+func (e *Environment) ShutdownCustomRecords(
+	isInitiator bool) (lnwire.CustomRecords, error) {
+
 	var shutdownCustomRecords lnwire.CustomRecords
 
 	err := fn.MapOptionZ(e.AuxCloser, func(a AuxChanCloser) error {

@@ -1957,6 +1957,7 @@ func (c *Config) ImplementationConfig(
 		}
 
 		if c.Dev.NeedMockAuxChanCloser() {
+			//nolint:ll
 			implCfg.AuxChanCloser = c.Dev.GetMockAuxChanCloserValueForTest()
 		}
 
